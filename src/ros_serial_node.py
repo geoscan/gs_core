@@ -28,21 +28,18 @@ from geometry_msgs.msg import Point
 from time import sleep,time
 
 rospy.init_node("ros_serial_node")
-
-p_name=rospy.search_param("port")
-port=rospy.get_param(p_name)
-ser=serial.Serial(port,9600,timeout=1)
+ser=serial.Serial(rospy.get_param(rospy.search_param("port")),9600,timeout=1)
 isWrite=False
 live=False
 log=[]
-ev_msgs=(b"prfl",b"tkff",b"land")
-dbg_msgs=(b"egst",b"ptrd",b"crld")
-sost_ev=-1
-sost_yw=0
-sost_pos=[0.,0.,0.,0.]
-sost_gps_pos=[0.,0.,0.]
-sost_board_led=[]
-sost_module_led=[]
+event_messages=(b"prfl",b"tkff",b"land")
+autopilot_event_messages=(b"egst",b"ptrd",b"crld")
+state_event=-1
+state_yaw=0
+state_position=[0.,0.,0.,0.]
+state_gps_position=[0.,0.,0.]
+state_board_led=[]
+state_module_led=[]
 tmp=b""
 last_check_time=0.0
 first=False
@@ -104,11 +101,11 @@ def heartbeat():
             try:
                 l,current,charge=struct.unpack(">4sff",msg_exchange(struct.pack(">6s",b'#powr&')))
                 if(l == b'powr'):
-                    state=SimpleBatteryState()
-                    state.header.stamp=rospy.Time.now()
-                    state.current=current
-                    state.change=charge
-                    battery_pub.publish(state)
+                    battery_state=SimpleBatteryState()
+                    battery_state.header.stamp=rospy.Time.now()
+                    battery_state.current=current
+                    battery_state.change=charge
+                    battery_pub.publish(battery_state)
             except:
                 pass
 
@@ -148,36 +145,36 @@ def handle_log(req):
     return s
 
 def handle_event(req):
-    global sost_ev
-    global ev_msgs
+    global state_event
+    global event_messages
     try:
-        if (req.event!=sost_ev):
-            msg=struct.pack(">5s4s1s",b"#evnt",ev_msgs[req.event],b"&")
-            send_log("send: change event to "+ str(ev_msgs[req.event],encoding='utf-8'))
+        if (req.event!=state_event):
+            msg=struct.pack(">5s4s1s",b"#evnt",event_messages[req.event],b"&")
+            send_log("send: change event to "+ str(event_messages[req.event],encoding='utf-8'))
             otv=struct.unpack(">4s",msg_exchange(msg))[0]
             send_log("response: "+ str(otv, encoding='utf-8'))
             if (otv==b"ever"):
                 status=-1
-            elif(otv==ev_msgs[req.event]):
-                if(dbg_msgs[req.event]!=None):
+            elif(otv==event_messages[req.event]):
+                if(autopilot_event_messages[req.event]!=None):
                     ev=struct.unpack(">4s",read_event())[0]
                     send_log("event-response: "+ str(ev, encoding='utf-8'))
-                    if(ev==dbg_msgs[req.event]):
+                    if(ev==autopilot_event_messages[req.event]):
                         status=1
                 else:
                     status=1
             else:
                 status=-2
-            sost_ev=req.event
+            state_event=req.event
             return EventResponse(status)
     except:
         return EventResponse(-3)
     return EventResponse(1)
 
 def handle_yaw(req):
-    global sost_yw
+    global state_yaw
     try:
-        if(req.angle!=sost_yw):
+        if(req.angle!=state_yaw):
             msg=struct.pack(">5sf1s",b"#updy",round(req.angle,2),b"&")
             send_log("send: update yaw - "+ str(round(req.angle,2)))
             otv=struct.unpack(">4s",msg_exchange(msg))[0]
@@ -186,17 +183,17 @@ def handle_yaw(req):
                 status=True
             else:
                 status=False
-            sost_yw=req.angle
+            state_yaw=req.angle
             return YawResponse(status)
     except:
         return YawResponse(False)
     return YawResponse(True)
 
 def handle_local_pos(req):
-    global sost_pos
+    global state_position
     n_s=[req.position.x,req.position.y,req.position.z,req.time]
     try:
-        if(n_s!=sost_pos):
+        if(n_s!=state_position):
             msg=struct.pack(">5sffff1s",b"#gtlp",round(n_s[0],2),round(n_s[1],2),round(n_s[2],2),round(n_s[3],2),b"&")
             send_log("send: go to local point - x: "+str(round(n_s[0],2))+", y: "+str(round(n_s[1],2))+", z: "+ str(round(n_s[2],2))+", time:"+str(round(n_s[3],2)))
             otv=struct.unpack(">4s",msg_exchange(msg))[0]
@@ -204,23 +201,23 @@ def handle_local_pos(req):
             if(otv==b"gtlp"):
                 ev=struct.unpack(">4s",read_event())[0]
                 send_log("event-response: "+ str(ev, encoding='utf-8'))
-                if(ev==dbg_msgs[1]):
+                if(ev==autopilot_event_messages[1]):
                     status=True
                 else:
                     status=False
             else:
                 status=False
-            sost_pos=n_s
+            state_position=n_s
             return PositionResponse(status)
     except:
         return PositionResponse(False)
     return PositionResponse(True)
 
 def handle_gps_pos(req):
-    global sost_gps_pos
+    global state_gps_position
     n_s=[req.position.latitude,req.position.longitude,req.position.altitude]
     try:
-        if(n_s!=sost_gps_pos):
+        if(n_s!=state_gps_position):
             msg=struct.pack(">5sfff1s",b"#gtpg",round(n_s[0],2),round(n_s[1],2),round(n_s[2],2),b"&")
             send_log("send: go to GPS position - latitude: "+str(round(n_s[0],2))+", longitude: "+str(round(n_s[1],2))+", altitude: "+str(round(n_s[2],2),b"&"))
             otv=struct.unpack(">4s",msg_exchange(msg))[0]
@@ -228,24 +225,24 @@ def handle_gps_pos(req):
             if(otv==b"gtpg"):
                 ev=struct.unpack(">4s",read_event())[0]
                 send_log("event-response: "+ str(ev, encoding='utf-8'))
-                if(ev==dbg_msgs[1]):
+                if(ev==autopilot_event_messages[1]):
                     status=True
                 else:
                     status=False
             else:
                 status=False
-            sost_gps_pos=n_s
+            state_gps_position=n_s
             return PositionGPSResponse(status)
     except:
         return PositionGPSResponse(False)
     return PositionGPSResponse(True)
 
 def handle_board_led(req):
-    global sost_board_led
+    global state_board_led
     leds=req.leds
     j=1
     try:
-        if(leds!=sost_board_led):
+        if(leds!=state_board_led):
             for i in range(0,len(leds)-1):
                 if(leds[i]==leds[i+1]):
                     j+=1
@@ -258,7 +255,7 @@ def handle_board_led(req):
             else:
                 aled=False
                 for i in range(0,len(leds)):
-                    if (leds[i]!=sost_board_led[i]):
+                    if (leds[i]!=state_board_led[i]):
                         msg=struct.pack(">5sBfff1s",b"#bled",i,int(leds[i].r),int(leds[i].g),int(leds[i].b),b"&")
                         send_log("send: change board leds color - n: "+str(i)+", r: "+str(int(leds[0].r))+", g: "+str(int(leds[0].g))+", b: "+str(int(leds[0].b)))
                         otv=struct.unpack(">4s",msg_exchange(msg))[0]
@@ -266,13 +263,13 @@ def handle_board_led(req):
             if(aled):
                 if(otv==b"aled"):
                     status=True
-                    sost_board_led=leds
+                    state_board_led=leds
                 else:
                     status=False
             else:
                 if(otv==b"bled"):
                     status=True
-                    sost_board_led=leds
+                    state_board_led=leds
                 else:
                     status=False
             return LedResponse(status)
@@ -281,11 +278,11 @@ def handle_board_led(req):
     return LedResponse(True)
 
 def handle_module_led(req):
-    global sost_module_led
+    global state_module_led
     leds=req.leds
     j=1
     try:
-        if(leds!=sost_module_led):
+        if(leds!=state_module_led):
             for i in range(0,len(leds)-1):
                 if(leds[i]==leds[i+1]):
                     j+=1
@@ -298,7 +295,7 @@ def handle_module_led(req):
             else:
                 aled=False
                 for i in range(0,len(leds)):
-                    if (leds[i]!=sost_module_led[i]):
+                    if (leds[i]!=state_module_led[i]):
                         msg=struct.pack(">5sBfff1s",b"#mled",i,int(leds[i].r),int(leds[i].g),int(leds[i].b),b"&")
                         send_log("send: change module leds color - n: "+str(i)+", r: "+str(int(leds[0].r))+", g: "+str(int(leds[0].g))+", b: "+str(int(leds[0].b)))
                         otv=struct.unpack(">4s",msg_exchange(msg))[0]
@@ -306,13 +303,13 @@ def handle_module_led(req):
             if(aled):
                 if(otv==b"lled"):
                     status=True
-                    sost_module_led=leds
+                    state_module_led=leds
                 else:
                     status=False
             else:
                 if(otv==b"mled"):
                     status=True
-                    sost_module_led=leds
+                    state_module_led=leds
                 else:
                     status=False
             return LedResponse(status)
@@ -504,10 +501,10 @@ s_altitude=Service("geoscan/sensors/altitude_service",Altitude,handle_alt)
 while not rospy.is_shutdown():
     if(not first):
         for _ in range(0,4):
-            sost_board_led.append(ColorRGBA())
+            state_board_led.append(ColorRGBA())
 
         for _ in range(0,25):
-            sost_module_led.append(ColorRGBA())
+            state_module_led.append(ColorRGBA())
 
         rospy.loginfo("Wait start connection ...")
         send_log("wait start connect")
