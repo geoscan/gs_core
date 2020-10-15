@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(gs_nodes)
+project(gs_core)
 
 find_package(catkin REQUIRED)
 
