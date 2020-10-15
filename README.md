@@ -1,1 +1,1 @@
-# gs_nodes
+# gs_core

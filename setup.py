@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'gs_nodes'
+package_name = 'gs_core'
 
 setup(
     name=package_name,
@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'ros_serial_node=gs_nodes.ros_serial_node:main'
+            'ros_serial_node=gs_core.ros_serial_node:main'
         ],
     },
 )
