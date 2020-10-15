@@ -1,4 +1,4 @@
-# Описание пакета gs_core
+# Описание пакета gs_core (Ранее gs_nodes)
 
 ## Описание:
 В данном пакете находятся необходимые основные ноды для корректной работы Geoscan Pioneer Max
@@ -54,4 +54,4 @@
 
  ```rosparam set ros_serial_node/port /dev/ttyS0```
  
- ```rosrun gs_nodes ros_serial_node.py ```
+ ```rosrun gs_core ros_serial_node.py ```
