@@ -523,7 +523,6 @@ s_info=Service("geoscan/board/info_service",Info,handle_info)
 s_tm=Service("geoscan/board/time_service",Time,handle_time)
 s_dltm=Service("geoscan/board/delta_time_service",Time,handle_dltm)
 s_lntm=Service("geoscan/board/launch_time_service",Time,handle_lntm)
-s_nav=Service("geoscan/board/navigation_system",NavigationSystem,handle_navSys)
 s_lpsvel=Service("geoscan/sensors/lpsvel_service",LpsVel,handle_lps_vel)
 s_lpsyaw=Service("geoscan/sensors/lpsyaw_service",LpsYaw,handle_lps_yaw)
 s_gyro=Service("geoscan/sensors/gyro_service",Gyro,handle_gyro)
@@ -531,6 +530,7 @@ s_acl=Service("geoscan/sensors/accel_service",Accel,handle_acl)
 s_ort=Service("geoscan/sensors/orientation_service",Orientation,handle_ort)
 s_altitude=Service("geoscan/sensors/altitude_service",Altitude,handle_alt)
 s_cargo=Service("geoscan/cargo",Cargo,handle_cargo)
+s_nav=Service("geoscan/navigation/system",NavigationSystem,handle_navSys)
 
 while not rospy.is_shutdown():
     if(not first):

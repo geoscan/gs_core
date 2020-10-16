@@ -36,6 +36,7 @@
 * geoscan/sensors/orientation_service (gs_interfaces/Orientation) - возвращает данные положения
 * geoscan/sensors/altitude_service (gs_interfaces/Altitude) - возвращает данные высоты по барометр
 * geoscan/sensors/altitude_service (gs_interfaces/Cargo) - управление модулем магнитного захвата
+* geoscan/navigation/system (gs_interfaces/NavigationSystem) - возвращает текущую систему позиционирования
 
 #### Топики:
 * geoscan/log_topic (std_msgs/String) - последнее сообщение лога
