@@ -115,6 +115,7 @@ def heartbeat():
                     battery_pub.publish(battery_state)
             except:
                 pass
+            if(navSystemName[navSystem] == navSystemName[0]):
                 try:
                     l,latitude,longitude,altitude=struct.unpack(">4sfff",msg_exchange(struct.pack(">6s",b'#gpsp&')))
                     if(l == b'gpsp'):
