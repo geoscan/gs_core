@@ -29,18 +29,20 @@
 * geoscan/board/time_service (gs_interfaces/Time) - возвращает время с момента включения коптера
 * geoscan/board/delta_time_service (gs_interfaces/Time) - возвращает разницу в секундах между временем включения коптера и глобальным временем системы навигации
 * geoscan/board/launch_time_service (gs_interfaces/Time) - возвращает время запуска для системы навигации
-* geoscan/sensors/lpspos_service (gs_interfaces/LpsPos) - возвращает позицию в LPS координатах
 * geoscan/sensors/lpsvel_service (gs_interfaces/LpsVel) - возвращает скорость коптера возвращаемую LPS
 * geoscan/sensors/lpsyaw_service (gs_interfaces/LpsYaw) - возвращает угол поворота в системе LPS
 * geoscan/sensors/gyro_service (gs_interfaces/Gyro) - возвращает данные c гироскопа
 * geoscan/sensors/accel_service (gs_interfaces/Accel) - возвращает данные c акселерометра
 * geoscan/sensors/orientation_service (gs_interfaces/Orientation) - возвращает данные положения
-* geoscan/sensors/range_service (gs_interfaces/Range) - возвращает данные c датчиков расстояния
 * geoscan/sensors/altitude_service (gs_interfaces/Altitude) - возвращает данные высоты по барометр
+* geoscan/sensors/altitude_service (gs_interfaces/Cargo) - управление модулем магнитного захвата
 
 #### Топики:
 * geoscan/log_topic (std_msgs/String) - последнее сообщение лога
 * geoscan/battery_state (gs_interfaces/SimpleBatteryState) - состояние АКБ
+* geoscan/local_position (geometry_msgs/Point) - локальные координаты в ситеме LPS
+* geoscan/global_position (gs_interfaces/PointGPS) - глобальные координаты GPS
+* geoscan/opt_velocity (gs_interfaces/OptVelocity) - данные с модуля оптического потока (OPT)
 
 ## Необходимые пакеты:
 1. Python:
