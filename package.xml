@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>gs_core</name>
-  <version>1.1.1</version>
+  <version>1.1.2</version>
   <description>The gs_core package</description>
 
   <maintainer email="ilya@eadsoft.com">Ilya Danilenko</maintainer>

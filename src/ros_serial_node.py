@@ -152,10 +152,8 @@ def heartbeat():
 
 def read_event():
     global ser
-    global isRead
     out_msg=b''
     is_taking=False
-    isRead=True
     while True:
         if(not isWrite):
             s=ser.read()
@@ -170,7 +168,6 @@ def read_event():
             elif(s==b'&'):
                 is_taking=True
                 out_msg=b''
-    isRead=False
     return out_msg
 
 def handle_live(req):
@@ -188,6 +185,8 @@ def handle_log(req):
 def handle_event(req):
     global state_event
     global event_messagess
+    global isRead
+    isRead=True
     try:
         if (req.event!=state_event):
             msg=struct.pack(">5s4s1s",b"#evnt",event_messagess[req.event],b"&")
@@ -198,18 +197,30 @@ def handle_event(req):
                 status=-1
             elif(otv==event_messagess[req.event]):
                 if(autopilot_event_messages[req.event]!=None):
-                    ev=struct.unpack(">4s",read_event())[0]
-                    send_log("event-response: "+ str(ev, encoding='utf-8'))
-                    if(ev==autopilot_event_messages[req.event]):
-                        status=1
-                else:
+                    ev=b''
+                    while ev != autopilot_event_messages[req.event]:
+                        try:
+                            ev=struct.unpack(">4s",read_event())[0]
+                            send_log("event-response: "+ str(ev, encoding='utf-8'))
+                        except:
+                            send_log("event-response: event response error")
+                            pass
                     status=1
+                    # if(ev==autopilot_event_messages[req.event]):
+                    #     status=1
+                    # else:
+                    #     status=-2
+                else:
+                    status=-2
             else:
                 status=-2
             state_event=req.event
+            isRead=False
             return EventResponse(status)
     except:
+        isRead=False
         return EventResponse(-3)
+    isRead=False
     return EventResponse(1)
 
 def handle_yaw(req):
@@ -232,6 +243,8 @@ def handle_yaw(req):
 
 def handle_local_pos(req):
     global state_position
+    global isRead
+    isRead=True
     n_s=[req.position.x,req.position.y,req.position.z,req.time]
     try:
         if(n_s!=state_position):
@@ -243,19 +256,24 @@ def handle_local_pos(req):
                 ev=struct.unpack(">4s",read_event())[0]
                 send_log("event-response: "+ str(ev, encoding='utf-8'))
                 if(ev==autopilot_event_messages[1]):
+                    state_position=n_s
                     status=True
                 else:
                     status=False
             else:
                 status=False
-            state_position=n_s
+            isRead=False
             return PositionResponse(status)
     except:
+        isRead=False
         return PositionResponse(False)
+    isRead=False
     return PositionResponse(True)
 
 def handle_gps_pos(req):
     global state_gps_position
+    global isRead
+    isRead=True
     n_s=[req.position.latitude,req.position.longitude,req.position.altitude]
     try:
         if(n_s!=state_gps_position):
@@ -267,15 +285,18 @@ def handle_gps_pos(req):
                 ev=struct.unpack(">4s",read_event())[0]
                 send_log("event-response: "+ str(ev, encoding='utf-8'))
                 if(ev==autopilot_event_messages[1]):
+                    state_gps_position=n_s
                     status=True
                 else:
                     status=False
             else:
                 status=False
-            state_gps_position=n_s
+            isRead=False
             return PositionGPSResponse(status)
     except:
+        isRead=False
         return PositionGPSResponse(False)
+    isRead=False
     return PositionGPSResponse(True)
 
 def handle_board_led(req):
