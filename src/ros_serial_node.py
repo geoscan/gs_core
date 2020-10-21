@@ -30,6 +30,7 @@ from time import sleep,time
 rospy.init_node("ros_serial_node")
 
 ser=serial.Serial(rospy.get_param(rospy.search_param("port")),9600,timeout=1)
+ser.open()
 isWrite=False
 live=False
 log=[]
@@ -61,7 +62,7 @@ def msg_exchange(msg):
     global live
     global last_check_time
     global first
-    while (isWrite):
+    while isWrite:
         pass
     isWrite=True
     ser.write(msg)
@@ -152,6 +153,10 @@ def heartbeat():
 
 def read_event():
     global ser
+
+    while isWrite:
+        pass
+
     out_msg=b''
     is_taking=False
     while True:
@@ -186,6 +191,10 @@ def handle_event(req):
     global state_event
     global event_messagess
     global isRead
+
+    while isRead:
+        pass
+
     isRead=True
     try:
         if (req.event!=state_event):
@@ -204,12 +213,7 @@ def handle_event(req):
                             send_log("event-response: "+ str(ev, encoding='utf-8'))
                         except:
                             send_log("event-response: event response error")
-                            pass
                     status=1
-                    # if(ev==autopilot_event_messages[req.event]):
-                    #     status=1
-                    # else:
-                    #     status=-2
                 else:
                     status=-2
             else:
@@ -253,13 +257,15 @@ def handle_local_pos(req):
             otv=struct.unpack(">4s",msg_exchange(msg))[0]
             send_log("response: "+ str(otv, encoding='utf-8'))
             if(otv==b"gtlp"):
-                ev=struct.unpack(">4s",read_event())[0]
-                send_log("event-response: "+ str(ev, encoding='utf-8'))
-                if(ev==autopilot_event_messages[1]):
-                    state_position=n_s
-                    status=True
-                else:
-                    status=False
+                ev=b''
+                while ev != autopilot_event_messages[1]:
+                    try:
+                        ev=struct.unpack(">4s",read_event())[0]
+                        send_log("event-response: "+ str(ev, encoding='utf-8'))
+                    except:
+                        send_log("event-response: event response error")
+                state_position=n_s
+                status=True
             else:
                 status=False
             isRead=False
@@ -273,6 +279,10 @@ def handle_local_pos(req):
 def handle_gps_pos(req):
     global state_gps_position
     global isRead
+
+    while isRead:
+        pass
+
     isRead=True
     n_s=[req.position.latitude,req.position.longitude,req.position.altitude]
     try:
@@ -282,13 +292,15 @@ def handle_gps_pos(req):
             otv=struct.unpack(">4s",msg_exchange(msg))[0]
             send_log("response: "+ str(otv, encoding='utf-8'))
             if(otv==b"gtpg"):
-                ev=struct.unpack(">4s",read_event())[0]
-                send_log("event-response: "+ str(ev, encoding='utf-8'))
-                if(ev==autopilot_event_messages[1]):
-                    state_gps_position=n_s
-                    status=True
-                else:
-                    status=False
+                ev=b''
+                while ev != autopilot_event_messages[1]:
+                    try:
+                        ev=struct.unpack(">4s",read_event())[0]
+                        send_log("event-response: "+ str(ev, encoding='utf-8'))
+                    except:
+                        send_log("event-response: event response error")
+                state_gps_position=n_s
+                status=True
             else:
                 status=False
             isRead=False
@@ -578,3 +590,5 @@ while not rospy.is_shutdown():
         first=True
     elif(not isRead):
         heartbeat()
+
+ser.close()
