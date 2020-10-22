@@ -30,7 +30,7 @@ from time import sleep,time
 rospy.init_node("ros_serial_node")
 
 ser=serial.Serial(rospy.get_param(rospy.search_param("port")),9600,timeout=1)
-ser.open()
+
 isWrite=False
 live=False
 log=[]
