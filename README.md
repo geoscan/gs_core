@@ -5,45 +5,49 @@
 
 ## Состав пакета:
 1. Ноды:
-* ros_serial_node
+* ros_plaz_node
 2. Файлы запуска:
 * pioneer.launch - запуск системы
 
 ## Описание нод:
-### 1. ros_serial_node
-Нода связи по протоколу UART между полетным контроллером Geoscan Pioneer и микрокомпьютером
+### 1. ros_plaz_node
+Нода связи по протоколу plazlink между полетным контроллером Geoscan Pioneer и микрокомпьютером
 
 #### Параметры:
 * port(string) - имя UART порта (пример: /dev/ttyS0), обязательный параметр 
 
 #### Сервисы:
 * geoscan/alive (gs_interfaces/Live) - возвращает статус соединения
-* geoscan/log_service (gs_interfaces/Log) - возвращает лог
-* geoscan/flight/event_service (gs_interfaces/Event) - приказывает автопилоту выполнить Event
-* geoscan/flight/yaw (gs_interfaces/Yaw) -приказывает автоплоту выполнить рысканье
-* geoscan/flight/local_position_service (gs_interfaces/Position) - приказывает автопилоту выполнить перемещение в локальных координатах
-* geoscan/flight/gps_position_service (gs_interfaces/PositionGPS) - риказывает автопилоту выполнить перемещение в GPS координатах
-* geoscan/led/board/control_service (gs_interfaces/Led) - управление светодиодами на плате Geoscan Pioneer
-* geoscan/led/module/control_service (gs_interfaces/Led) - управление светодиодами на LED модуле
-* geoscan/board/info_service (gs_interfaces/Info) - возвращает бортовой номер
-* geoscan/board/time_service (gs_interfaces/Time) - возвращает время с момента включения коптера
-* geoscan/board/delta_time_service (gs_interfaces/Time) - возвращает разницу в секундах между временем включения коптера и глобальным временем системы навигации
-* geoscan/board/launch_time_service (gs_interfaces/Time) - возвращает время запуска для системы навигации
-* geoscan/sensors/lpsvel_service (gs_interfaces/LpsVel) - возвращает скорость коптера возвращаемую LPS
-* geoscan/sensors/lpsyaw_service (gs_interfaces/LpsYaw) - возвращает угол поворота в системе LPS
-* geoscan/sensors/gyro_service (gs_interfaces/Gyro) - возвращает данные c гироскопа
-* geoscan/sensors/accel_service (gs_interfaces/Accel) - возвращает данные c акселерометра
-* geoscan/sensors/orientation_service (gs_interfaces/Orientation) - возвращает данные положения
-* geoscan/sensors/altitude_service (gs_interfaces/Altitude) - возвращает данные высоты по барометр
-* geoscan/sensors/altitude_service (gs_interfaces/Cargo) - управление модулем магнитного захвата
-* geoscan/navigation/system (gs_interfaces/NavigationSystem) - возвращает текущую систему позиционирования
+* geoscan/get_log (gs_interfaces/Log) - возвращает лог
+* geoscan/flight/set_event (gs_interfaces/Event) - приказывает автопилоту выполнить Event
+* geoscan/flight/set_yaw (gs_interfaces/Yaw) - приказывает автоплоту выполнить рысканье
+* geoscan/flight/set_local_position (gs_interfaces/Position) - приказывает автопилоту выполнить перемещение в локальных координатах
+* geoscan/flight/set_global_position (gs_interfaces/PositionGPS) - приказывает автопилоту выполнить перемещение в глобальных координатах
+* geoscan/led/board/set (gs_interfaces/Led) - управление светодиодами на плате Geoscan Pioneer
+* geoscan/led/module/set (gs_interfaces/Led) - управление светодиодами на LED модуле
+* geoscan/cargo/set (gs_interfaces/Cargo) - управление модулем магнитного захвата
+* geoscan/board/get_info (gs_interfaces/Info) - возвращает бортовой номер
+* geoscan/board/get_time (gs_interfaces/Time) - возвращает время с момента включения коптера
+* geoscan/board/get_uptime (gs_interfaces/Time) - возвращает время запуска для системы навигации
+* geoscan/board/get_flight_time (gs_interfaces/Time) - возвращает время с начала полета
+* geoscan/navigation/get_system (gs_interfaces/NavigationSystem) - возвращает текущую систему позиционирования
 
 #### Топики:
-* geoscan/log_topic (std_msgs/String) - последнее сообщение лога
+* geoscan/log (std_msgs/String) - последнее сообщение лога
 * geoscan/battery_state (gs_interfaces/SimpleBatteryState) - состояние АКБ
-* geoscan/local_position (geometry_msgs/Point) - локальные координаты в ситеме LPS
-* geoscan/global_position (gs_interfaces/PointGPS) - глобальные координаты GPS
-* geoscan/opt_velocity (gs_interfaces/OptVelocity) - данные с модуля оптического потока (OPT)
+* geoscan/navigation/local/position (geometry_msgs/Point) - локальные координаты в ситеме LPS
+* geoscan/navigation/local/yaw (std_msgs/Float32) - угол поворота в системе LPS
+* geoscan/navigation/local/velocity (geometry_msgs/Point) - скорость коптера возвращаемая LPS
+* geoscan/navigation/global/position (gs_interfaces/PointGPS) - глобальные координаты GPS
+* geoscan/navigation/global/status (std_msgs/Int8) - статус GPS модуля
+* geoscan/navigation/satellites (gs_interfaces/SatellitesGPS)- количество спутников
+* geoscan/navigation/opt/velocity (gs_interfaces/OptVelocity) - данные с модуля оптического потока (OPT)
+* geoscan/flight/callback_event (std_msgs/Int32) - события вытопилота
+* geoscan/sensors/gyro (geometry_msgs/Point) - данные c гироскопа
+* geoscan/sensors/accel (geometry_msgs/Point) - данные c акселерометра
+* geoscan/sensors/orientation (gs_interfaces/Orientation) - данные положения
+* geoscan/sensors/altitude (std_msgs/Float32) - данные высоты по барометр
+* geoscan/sensors/mag (geometry_msgs/Point) - данные магнитометра
 
 ## Необходимые пакеты:
 1. Python:
@@ -55,6 +59,6 @@
 
 ## Использование:
 
- ```rosparam set ros_serial_node/port /dev/ttyS0```
+ ```rosparam set ros_plaz_node/port /dev/ttyS0```
  
- ```rosrun gs_core ros_serial_node.py ```
+ ```rosrun gs_core ros_plaz_node.py ```
