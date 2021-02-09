@@ -29,7 +29,7 @@ messenger = Messenger(stream)
 log = []
 live = False
 event_messages = (10, 12, 23, 2)
-callback_event_messages = (255, 27, 31, 32, 42, 43, 51, 56, 65)
+callback_event_messages = (255, 26, 31, 32, 42, 43, 51, 56, 65)
 state_event = -1
 state_callback_event = 0
 state_position = [0., 0., 0., 0.]
@@ -62,9 +62,9 @@ def handle_local_pos(req):
             send_log("send: go to local point - x: {}, y: {}, z: {}, time: {}".format(request_position[0],request_position[1],request_position[2],req.time))
             fields = {}
             fields['id'] = Message.GOTO_LOCAL_POINT
-            fields['x'] = int(request_position[0])
-            fields['y'] = int(request_position[1])
-            fields['z'] = int(request_position[2])
+            fields['x'] = int(request_position[0] * 1e3 )
+            fields['y'] = int(request_position[1] * 1e3 )
+            fields['z'] = int(request_position[2] * 1e3 )
             fields['time'] = int(req.time)
             messenger.invokeAsync(packet=fields)
             state_position = request_position
@@ -223,7 +223,8 @@ def on_fields_changed(device, fields):
     global callback_event_messages
     global callback_event_publisher
     if messenger.hub[device].name == 'FlightManager':
-        event=messenger.hub['FlightManager']['event'].value
+        event = messenger.hub['FlightManager']['event'].value
+        messenger.hub['FlightManager']['event'].write(value=event,callback=None, blocking=False)
         if event != state_callback_event:
             callback_event_publisher.publish(callback_event_messages.index(event))
             state_callback_event = event
