@@ -25,7 +25,6 @@
 * geoscan/flight/set_global_position (gs_interfaces/PositionGPS) - приказывает автопилоту выполнить перемещение в глобальных координатах
 * geoscan/led/board/set (gs_interfaces/Led) - управление светодиодами на плате Geoscan Pioneer
 * geoscan/led/module/set (gs_interfaces/Led) - управление светодиодами на LED модуле
-* geoscan/cargo/set (gs_interfaces/Cargo) - управление модулем магнитного захвата
 * geoscan/board/get_info (gs_interfaces/Info) - возвращает бортовой номер
 * geoscan/board/get_time (gs_interfaces/Time) - возвращает время с момента включения коптера
 * geoscan/board/get_uptime (gs_interfaces/Time) - возвращает время запуска для системы навигации
