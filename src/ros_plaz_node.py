@@ -400,9 +400,9 @@ if messenger.hub.model == 12:
             try:
                 send_log("send: Local position request")
                 local_point = Point()
-                local_point.x = messenger.hub['USNav_module']['x'].read()[0]
-                local_point.y = messenger.hub['USNav_module']['y'].read()[0]
-                local_point.z = messenger.hub['USNav_module']['z'].read()[0]
+                local_point.x = messenger.hub['USNav_module']['x'].read()[0] * 0.001
+                local_point.y = messenger.hub['USNav_module']['y'].read()[0] * 0.001
+                local_point.z = messenger.hub['USNav_module']['z'].read()[0] * 0.001
                 send_log("response: Local position - [{}, {}, {}]".format(local_point.x,local_point.y,local_point.z))
                 local_position_publisher.publish(local_point)
 
