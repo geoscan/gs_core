@@ -15,7 +15,6 @@ from gs_interfaces.srv import Info,InfoResponse
 from gs_interfaces.srv import NavigationSystem,NavigationSystemResponse
 from gs_interfaces.srv import Position,PositionResponse
 from gs_interfaces.srv import PositionGPS,PositionGPSResponse
-from gs_interfaces.srv import Cargo, CargoResponse
 from gs_interfaces.srv import Yaw, YawResponse
 from gs_interfaces.msg import SimpleBatteryState,PointGPS,OptVelocity,Orientation,SatellitesGPS
 from std_msgs.msg import String,Float32,ColorRGBA,Int32,Int8
@@ -208,15 +207,6 @@ def handle_navSys(req):
     global navSystemName
     return NavigationSystemResponse(navSystemName[navSystem])
 
-def handle_cargo(req):
-    global messenger
-    try:
-        send_log("send: Cargo state - {}".format(req.state))
-        messenger.hub['LedBar']['cargo'].write(req.state)
-        return CargoResponse(True)
-    except:
-        return CargoResponse(False)
-
 def on_fields_changed(device, fields):
     global messenger
     global state_callback_event
@@ -234,8 +224,6 @@ def on_fields_changed(device, fields):
 
 logger = Service("geoscan/get_log",Log,handle_log)
 alive = Service("geoscan/alive",Live,handle_live)
-
-cargo = Service("geoscan/cargo/set",Cargo,handle_cargo)
 
 info_service = Service("geoscan/board/get_info",Info,handle_info)
 time_service = Service("geoscan/board/get_time",Time,handle_time)
