@@ -8,6 +8,8 @@
 * ros_plaz_node
 2. Файлы запуска:
 * pioneer.launch - запуск системы
+3. Python скрипты
+* restart.py
 
 ## Описание нод:
 ### 1. ros_plaz_node
@@ -48,6 +50,10 @@
 * geoscan/sensors/altitude (std_msgs/Float32) - данные высоты по барометр
 * geoscan/sensors/mag (geometry_msgs/Point) - данные магнитометра
 
+## Описание Python скриптов:
+### 1. restart.py
+При выполнении перезапускает базовую плату Геоскан Пионер
+
 ## Необходимые пакеты:
 1. Python:
     * PySerial
@@ -57,7 +63,6 @@
     * std_msgs
 
 ## Использование:
-
  ```rosparam set ros_plaz_node/port /dev/ttyS0```
  
  ```rosrun gs_core ros_plaz_node.py ```
