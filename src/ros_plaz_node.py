@@ -16,7 +16,8 @@ from gs_interfaces.srv import NavigationSystem,NavigationSystemResponse
 from gs_interfaces.srv import Position,PositionResponse
 from gs_interfaces.srv import PositionGPS,PositionGPSResponse
 from gs_interfaces.srv import Yaw, YawResponse
-from gs_interfaces.msg import SimpleBatteryState,PointGPS,OptVelocity,Orientation,SatellitesGPS
+from gs_interfaces.srv import ParametersList, ParametersListResponse
+from gs_interfaces.msg import SimpleBatteryState,PointGPS,OptVelocity,Orientation,SatellitesGPS, Parameter
 from std_msgs.msg import String,Float32,ColorRGBA,Int32,Int8
 from geometry_msgs.msg import Point
 
@@ -38,6 +39,7 @@ state_module_led=[]
 navSystem = 0
 navSystemName = {0:"GPS", 1:"LPS", 2:"OPT"}
 global_point_seq = 0
+autopilot_params = []
 
 def handle_event(req):
     global messenger
@@ -207,6 +209,10 @@ def handle_navSys(req):
     global navSystemName
     return NavigationSystemResponse(navSystemName[navSystem])
 
+def handle_autopilot_params(req):
+    global autopilot_params
+    return ParametersListResponse(autopilot_params)
+
 def on_fields_changed(device, fields):
     global messenger
     global state_callback_event
@@ -229,6 +235,7 @@ info_service = Service("geoscan/board/get_info",Info,handle_info)
 time_service = Service("geoscan/board/get_time",Time,handle_time)
 uptime_service = Service("geoscan/board/get_uptime",Time,handle_uptime)
 flight_time_service = Service("geoscan/board/get_flight_time",Time,handle_flight_time)
+autopilot_params_service = Service("geoscan/board/get_parameters",ParametersList,handle_autopilot_params)
 
 navigation_service = Service("geoscan/navigation/get_system",NavigationSystem,handle_navSys)
 
@@ -274,12 +281,16 @@ if messenger.hub.model == 12:
     while not rospy.is_shutdown():
         try:
             for i in range(0,messenger.hub.getParamCount()):
-                param = messenger.hub.getParam(i)
-                if param[0] == 'Flight_com_navSystem':
-                    navSystem = int(param[1])
+                parameter = Parameter()
+                string, parameter.value = messenger.hub.getParam(i)
+                parameter.name = String(string)
+                if parameter.name.data == 'Flight_com_navSystem':
+                    navSystem = int(parameter.value)
+                autopilot_params.append(parameter)
             break
         except:
             pass
+
     for _ in range(0,4):
             state_board_led.append(ColorRGBA())
 

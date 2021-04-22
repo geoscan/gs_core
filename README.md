@@ -31,6 +31,7 @@
 * geoscan/board/get_time (gs_interfaces/Time) - возвращает время с момента включения коптера
 * geoscan/board/get_uptime (gs_interfaces/Time) - возвращает время запуска для системы навигации
 * geoscan/board/get_flight_time (gs_interfaces/Time) - возвращает время с начала полета
+* geoscan/board/get_parameters (gs_interface/ParametersList) - возварщает параметры АП
 * geoscan/navigation/get_system (gs_interfaces/NavigationSystem) - возвращает текущую систему позиционирования
 
 #### Топики:
