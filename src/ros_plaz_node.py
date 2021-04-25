@@ -3,9 +3,9 @@
 
 import rospy
 import proto
-from proto import SerialStream,Messenger,Message
-from rospy import Publisher,Service
-from time import sleep,time
+from proto import SerialStream, Messenger, Message
+from rospy import Publisher, Service
+from time import sleep, time
 from gs_interfaces.srv import Live
 from gs_interfaces.srv import Log,LogResponse
 from gs_interfaces.srv import Led,LedResponse
@@ -20,16 +20,22 @@ from gs_interfaces.srv import ParametersList, ParametersListResponse
 from gs_interfaces.msg import SimpleBatteryState,PointGPS,OptVelocity,Orientation,SatellitesGPS, Parameter
 from std_msgs.msg import String,Float32,ColorRGBA,Int32,Int8
 from geometry_msgs.msg import Point
+from std_srvs.srv import Empty, EmptyResponse
 
 rospy.init_node("ros_plaz_node")
-stream = SerialStream(rospy.get_param(rospy.search_param("port")),57600)
 
-messenger = Messenger(stream)
+TIME_FOR_RESTART = 5
+
+UART = rospy.get_param(rospy.search_param("port"))
 
 log = []
 live = False
+restart = False
+
 event_messages = (10, 12, 23, 2)
 callback_event_messages = (255, 26, 31, 32, 42, 43, 51, 56, 65)
+navSystemName = {0:"GPS", 1:"LPS", 2:"OPT"}
+
 state_event = -1
 state_callback_event = 0
 state_position = [0., 0., 0., 0.]
@@ -37,9 +43,47 @@ state_gps_position = [0., 0., 0.]
 state_board_led=[]
 state_module_led=[]
 navSystem = 0
-navSystemName = {0:"GPS", 1:"LPS", 2:"OPT"}
 global_point_seq = 0
 autopilot_params = []
+
+messenger = None
+
+def send_log(msg):
+    global log
+    global logger_publisher
+    msg = f"[{time()}] {msg}"
+    log.append(msg)
+    logger_publisher.publish(msg)
+
+def disconnect():
+    global messenger
+    if messenger != None:
+        messenger.stop()
+        messenger.handler.stream.socket.close()
+        messenger = None
+
+def restart_board():
+    global live
+    global messenger
+    global restart
+    send_log("restart board - start")
+    restart = True
+    live = False
+    rospy.loginfo("Restarting board ...")
+    messenger.hub.sendCommand(18)
+    disconnect()
+    sleep(TIME_FOR_RESTART)
+    send_log("restart board - finish")
+    rospy.loginfo("Restart board - done")
+    restart = False
+
+def handle_live(req):
+    global live
+    return live
+
+def handle_restart(req):
+    restart_board()
+    return EmptyResponse()
 
 def handle_event(req):
     global messenger
@@ -47,7 +91,7 @@ def handle_event(req):
     global event_messages
     try:
         if state_event != req.event:
-            send_log("send: Event - {}".format(req.event))
+            send_log(f"send: Event - {req.event}")
             messenger.hub['UavMonitor']['mode'].write(event_messages[req.event])
             state_event = req.event
     except:
@@ -60,7 +104,7 @@ def handle_local_pos(req):
     request_position = [req.position.x,req.position.y,req.position.z]
     try:
         if request_position != state_position:
-            send_log("send: go to local point - x: {}, y: {}, z: {}, time: {}".format(request_position[0],request_position[1],request_position[2],req.time))
+            send_log(f"send: go to local point - x: {request_position[0]}, y: {request_position[1]}, z: {request_position[2]}, time: {req.time}")
             fields = {}
             fields['id'] = Message.GOTO_LOCAL_POINT
             fields['x'] = int(request_position[0] * 1e3 )
@@ -81,7 +125,7 @@ def handle_gps_pos(req):
     try:
         if request_position != state_gps_position:
             callback = lambda packet: proto.listen(Message.GO_TO_POINT_RESPONSE, packet)
-            send_log("send: go to global position - latitude: {} , longitude: {} altitude: {}".format(request_position[0],request_position[1],request_position[2]))
+            send_log(f"send: go to global position - latitude: {request_position[0]} , longitude: {request_position[1]} altitude: {request_position[2]}")
             fields = {}
             fields['id'] = Message.GO_TO_POINT_V2
             fields['sequence'] = global_point_seq
@@ -111,7 +155,7 @@ def handle_gps_pos(req):
 def handle_yaw(req):
     global messenger
     try:
-        send_log("send: update yaw - angle:{}".format(req.angle))
+        send_log(f"send: update yaw - angle:{req.angle}")
         messenger.hub['ManualControl']['yawManual'].write(int(req.angle * 100.0))
     except:
         return YawResponse(False)
@@ -124,7 +168,7 @@ def handle_board_led(req): # Module_lua = 0
         if req.leds != state_board_led:
             for i in range(0, len(req.leds)):
                 if req.leds[i] != state_board_led[i]:
-                    send_log("send: change board leds color - n:{}, r: {}, g: {}, b: {}".format(i, req.leds[i].r, req.leds[i].g, req.leds[i].b))
+                    send_log(f"send: change board leds color - n:{i}, r: {req.leds[i].r}, g: {req.leds[i].g}, b: {req.leds[i].b}")
                     messenger.hub['LedBar']['color'].write( int(req.leds[i].r) | (int(req.leds[i].g) << 8) | (int(req.leds[i].b) << 16) | (i << 24) )
                     state_board_led[i] = req.leds[i]
     except:
@@ -138,23 +182,12 @@ def handle_module_led(req):
         if req.leds != state_module_led:
             for i in range(4, len(req.leds)+4):
                 if req.leds[i] != state_module_led[i]:
-                    send_log("send: change module leds color - n:{}, r: {}, g: {}, b: {}".format(i, req.leds[i].r, req.leds[i].g, req.leds[i].b))
+                    send_log(f"send: change module leds color - n:{i}, r: {req.leds[i].r}, g: {req.leds[i].g}, b: {req.leds[i].b}")
                     messenger.hub['LedBar']['color'].write( int(req.leds[i].r) | (int(req.leds[i].g) << 8) | (int(req.leds[i].b) << 16) | (i << 24) )
                     state_module_led[i] = req.leds[i]
     except:
         return LedResponse(False)
     return LedResponse(True)
-
-def handle_live(req):
-    global live
-    return live
-
-def send_log(msg):
-    global log
-    global logger_publisher
-    msg = "[{}] {}".format(time(),msg)
-    log.append(msg)
-    logger_publisher.publish(msg)
 
 def handle_log(req):
     global log
@@ -165,7 +198,7 @@ def handle_time(req):
     try:
         send_log("send: time request")
         board_time = float(messenger.hub['UavMonitor']['time'].read()[0]) / 1000000.0 + 315964800.0
-        send_log("response: time - {}".format(board_time))
+        send_log(f"response: time - {board_time}")
         return TimeResponse(board_time)
     except:
         pass
@@ -176,7 +209,7 @@ def handle_uptime(req):
     try:
         send_log("send: uptime request")
         uptime = messenger.hub['UavMonitor']['uptime'].read()[0]
-        send_log("response: uptime - {}".format(uptime))
+        send_log(f"response: uptime - {uptime}")
         return TimeResponse(uptime)
     except:
         pass
@@ -187,18 +220,18 @@ def handle_flight_time(req):
     try:
         send_log("send: flight time request")
         flight_time = messenger.hub['UavMonitor']['missionTime'].read()[0]
-        send_log("response: flight time - {}".format(flight_time))
+        send_log(f"response: flight time - {flight_time}")
         return TimeResponse(flight_time)
     except:
         pass
-    return TimeResponse(0.)      
+    return TimeResponse(0.)
 
 def handle_info(req):
     global messenger
     try:
         send_log("send: board number request")
         num = str(messenger.hub['UavMonitor']['number'].read()[0])
-        send_log("response: board number - {}".format(num))
+        send_log(f"response: board number - {num}")
         return InfoResponse(num)
     except:
         pass
@@ -228,6 +261,196 @@ def on_fields_changed(device, fields):
         if messenger.hub['UavMonitor']['mode'].value == 2:
             messenger.hub['FlightManager']['event'].write(value=255,callback=None, blocking=False)
 
+def init():
+    global live
+    global messenger
+    global navSystem
+    global autopilot_params
+    if ((messenger.hub.model == 12) and not live):
+        try:
+            for i in range(0, messenger.hub.getParamCount()):
+                parameter = Parameter()
+                string, parameter.value = messenger.hub.getParam(i)
+                parameter.name = String(string)
+                if parameter.name.data == 'Flight_com_navSystem':
+                    navSystem = int(parameter.value)
+                autopilot_params.append(parameter)
+        except:
+            disconnect()
+
+        for _ in range(0,4):
+            state_board_led.append(ColorRGBA())
+
+        for _ in range(0,25):
+            state_module_led.append(ColorRGBA())
+
+        messenger.hub.onFieldsChanged = on_fields_changed
+        messenger.hub['FlightManager']['event'].write(255)
+        messenger.hub['LedBar']['color'].write(0 | (0 << 8) | (0 << 16) | (255 << 24) )
+
+        rospy.loginfo("Board start connect - done")
+        live = True
+
+def data_exchange():
+    global messenger
+    global live
+    global battery_publisher
+    global gyro_publisher
+    global accel_publisher
+    global orientation_publisher
+    global altitude_publisher
+    global global_position_publisher
+    global mag_publisher
+    global satellites_publisher
+    global global_status_publisher
+    global local_position_publisher
+    global local_velocity_publisher
+    global opt_velocity_publisher
+    global restart
+    if messenger != None:
+        if live:
+            try:
+                send_log("send: Battery state request")
+                battery_state = SimpleBatteryState()
+                battery_state.header.stamp = rospy.Time.now()
+                battery_state.charge = messenger.hub['CBoard']['VoltBatt'].read()[0] / 1000.0
+                send_log("response: Battery state - {}".format(battery_state.charge))
+                battery_publisher.publish(battery_state)
+            except:
+                pass
+
+            try:
+                send_log("send: Gyro request")
+                gyro = Point()
+                gyro.x = messenger.hub['SensorMonitor']['gyroX'].read()[0] / 1e3
+                gyro.y = messenger.hub['SensorMonitor']['gyroY'].read()[0] / 1e3
+                gyro.z = messenger.hub['SensorMonitor']['gyroZ'].read()[0] / 1e3
+                send_log("response: Gyro - [{}, {}, {}]".format(gyro.x,gyro.y,gyro.z))
+                gyro_publisher.publish(gyro)
+            except:
+                pass
+
+            try:
+                send_log("send: Accel request")
+                accel = Point()
+                accel.x = messenger.hub['SensorMonitor']['accelX'].read()[0] / 1e3
+                accel.y = messenger.hub['SensorMonitor']['accelY'].read()[0] / 1e3
+                accel.z = messenger.hub['SensorMonitor']['accelZ'].read()[0] / 1e3
+                send_log("response: Accel - [{}, {}, {}]".format(accel.x,accel.y,accel.z))
+                accel_publisher.publish(accel)
+            except:
+                pass
+
+            try:
+                send_log("send: Orientation request")
+                orientation = Orientation()
+                orientation.roll = messenger.hub['UavMonitor']['roll'].read()[0] / 1e2
+                orientation.pitch = messenger.hub['UavMonitor']['pitch'].read()[0] / 1e2
+                orientation.azimuth = messenger.hub['UavMonitor']['yaw'].read()[0] / 1e2
+                send_log("response: Orientation - [{}, {}, {}]".format(orientation.roll,orientation.pitch,orientation.azimuth))
+                orientation_publisher.publish(orientation)
+            except:
+                pass
+
+            try:
+                send_log("send: Altitude request")
+                altitude = messenger.hub['UavMonitor']['altitude'].read()[0] / 1e3
+                send_log("response: Altitude - {}".format(altitude))
+                altitude_publisher.publish(altitude)
+            except:
+                pass
+
+            if navSystem == 0:
+                try:
+                    send_log("send: Global position request")
+                    global_point = PointGPS()
+                    global_point.latitude = messenger.hub['Ublox']['latitude'].read()[0] / 1e7
+                    global_point.longitude = messenger.hub['Ublox']['longitude'].read()[0] / 1e7
+                    global_point.altitude = messenger.hub['Ublox']['altitude'].read()[0] / 1e3
+                    send_log("response: Global position - [{}, {}, {}]".format(global_point.latitude,global_point.longitude,global_point.altitude))
+                    global_position_publisher.publish(global_point)
+
+                    send_log("send: Mag request")
+                    mag = Point()
+                    mag.x = messenger.hub['SensorMonitor']['magX'].read()[0] / 1e3
+                    mag.y = messenger.hub['SensorMonitor']['magY'].read()[0] / 1e3
+                    mag.z = messenger.hub['SensorMonitor']['magZ'].read()[0] / 1e3
+                    send_log("response: Mag - [{}, {}, {}]".format(mag.x,mag.y,mag.z))
+                    mag_publisher.publish(mag)
+
+                    sat = SatellitesGPS()
+                    try:
+                        sat.gps = messenger.hub['Ublox']['satGps'].read()[0]
+                    except:
+                        sat.gps = 0
+
+                    try:
+                        sat.glonass = messenger.hub['Ublox']['satGlonass'].read()[0]
+                    except:
+                        sat.glonass = 0
+                    satellites_publisher.publish(sat)
+
+                    send_log("send: Global status")
+                    status = messenger.hub['Ublox']['status'].read()[0]
+                    send_log("response: Global status - {}".format(status))
+                    global_status_publisher.publish(status)
+
+                except:
+                    if not restart:
+                        live = False
+                        rospy.logerr("Gnns Module not found")
+                        send_log("error: Gnns Module not found")
+                        disconnect()
+            elif navSystem == 1:
+                try:
+                    send_log("send: Local position request")
+                    local_point = Point()
+                    local_point.x = messenger.hub['USNav_module']['x'].read()[0] * 0.001
+                    local_point.y = messenger.hub['USNav_module']['y'].read()[0] * 0.001
+                    local_point.z = messenger.hub['USNav_module']['z'].read()[0] * 0.001
+                    send_log("response: Local position - [{}, {}, {}]".format(local_point.x,local_point.y,local_point.z))
+                    local_position_publisher.publish(local_point)
+
+                    send_log("send: LPS yaw request")
+                    yaw=messenger.hub['USNav_module']['yaw'].read()[0]
+                    send_log("response: LPS yaw - {}".format(yaw))
+                    local_yaw_publisher.publish(yaw)
+
+                    send_log("send: LPS velocity request")
+                    lps_vel = Point()
+                    lps_vel.x = messenger.hub['USNav_module']['velX'].read()[0]
+                    lps_vel.y = messenger.hub['USNav_module']['velY'].read()[0]
+                    lps_vel.z = messenger.hub['USNav_module']['velZ'].read()[0]
+                    send_log("response: LPS velocity - [{}, {}, {}]".format(lps_vel.x,lps_vel.y,lps_vel.z))
+                    local_velocity_publisher.publish(lps_vel)
+                except:
+                    if not restart:
+                        live = False
+                        rospy.logerr("LPS not found")
+                        send_log("error: LPS not found")
+                        disconnect()
+            elif navSystem == 2:
+                try:
+                    send_log("send: OpticalFlow velocity request")
+                    velocity = OptVelocity()
+                    velocity.x = messenger.hub['SensorMonitor']['optFlowX'].read()[0]
+                    velocity.y = messenger.hub['SensorMonitor']['optFlowY'].read()[0]
+                    velocity.range = messenger.hub['SensorMonitor']['optFlowRange'].read()[0] / 1e3
+                    send_log("response: OpticalFlow velocity - [{}, {}, {}]".format(velocity.x,velocity.y,velocity.range))
+                    opt_velocity_publisher.publish(velocity)
+                except:
+                    if not restart:
+                        live = False
+                        rospy.logerr("OpticalFlow Module not found")
+                        send_log("error: OpticalFlow Module not found")
+                        disconnect()
+        else:
+            live = False
+            disconnect()
+    else:
+        live = False
+
+restart_service = Service("geoscan/restart", Empty, handle_restart)
 logger = Service("geoscan/get_log",Log,handle_log)
 alive = Service("geoscan/alive",Live,handle_live)
 
@@ -268,172 +491,23 @@ orientation_publisher = Publisher("geoscan/sensors/orientation",Orientation,queu
 altitude_publisher = Publisher("geoscan/sensors/altitude",Float32,queue_size=10)
 mag_publisher = Publisher("geoscan/sensors/mag",Point,queue_size=10)
 
-rospy.loginfo("Wait start connection ...")
-send_log("wait start connect")
-try:
-    messenger.connect()
-except:
-    rospy.logerr("Geoscan Pioneer baseboard is not connected to this serial port")
-    messenger.stop()
-    stream.socket.close()
-    exit()
-if messenger.hub.model == 12:
-    while not rospy.is_shutdown():
-        try:
-            for i in range(0,messenger.hub.getParamCount()):
-                parameter = Parameter()
-                string, parameter.value = messenger.hub.getParam(i)
-                parameter.name = String(string)
-                if parameter.name.data == 'Flight_com_navSystem':
-                    navSystem = int(parameter.value)
-                autopilot_params.append(parameter)
-            break
-        except:
-            pass
-
-    for _ in range(0,4):
-            state_board_led.append(ColorRGBA())
-
-    for _ in range(0,25):
-            state_module_led.append(ColorRGBA())
-    
-    messenger.hub.onFieldsChanged = on_fields_changed
-    messenger.hub['FlightManager']['event'].write(255)
-    messenger.hub['LedBar']['color'].write(0 | (0 << 8) | (0 << 16) | (255 << 24) )
-    
-    rospy.loginfo("Board start connect - done")
-    send_log("start connect - done")
-    live = True
-    while not rospy.is_shutdown():
-        try:
-            send_log("send: Battery state request")
-            battery_state = SimpleBatteryState()
-            battery_state.header.stamp = rospy.Time.now()
-            battery_state.charge = messenger.hub['CBoard']['VoltBatt'].read()[0] / 1000.0
-            send_log("response: Battery state - {}".format(battery_state.charge))
-            battery_publisher.publish(battery_state)
-        except:
-            pass
-
-        try:
-            send_log("send: Gyro request")
-            gyro = Point()
-            gyro.x = messenger.hub['SensorMonitor']['gyroX'].read()[0] / 1e3
-            gyro.y = messenger.hub['SensorMonitor']['gyroY'].read()[0] / 1e3
-            gyro.z = messenger.hub['SensorMonitor']['gyroZ'].read()[0] / 1e3
-            send_log("response: Gyro - [{}, {}, {}]".format(gyro.x,gyro.y,gyro.z))
-            gyro_publisher.publish(gyro)
-        except:
-            pass
-
-        try:
-            send_log("send: Accel request")
-            accel = Point()
-            accel.x = messenger.hub['SensorMonitor']['accelX'].read()[0] / 1e3
-            accel.y = messenger.hub['SensorMonitor']['accelY'].read()[0] / 1e3
-            accel.z = messenger.hub['SensorMonitor']['accelZ'].read()[0] / 1e3
-            send_log("response: Accel - [{}, {}, {}]".format(accel.x,accel.y,accel.z))
-            accel_publisher.publish(accel)
-        except:
-            pass
-
-        try:
-            send_log("send: Orientation request")
-            orientation = Orientation()
-            orientation.roll = messenger.hub['UavMonitor']['roll'].read()[0] / 1e2
-            orientation.pitch = messenger.hub['UavMonitor']['pitch'].read()[0] / 1e2
-            orientation.azimuth = messenger.hub['UavMonitor']['yaw'].read()[0] / 1e2
-            send_log("response: Orientation - [{}, {}, {}]".format(orientation.roll,orientation.pitch,orientation.azimuth))
-            orientation_publisher.publish(orientation)
-        except:
-            pass
-
-        try:
-            send_log("send: Altitude request")
-            altitude = messenger.hub['UavMonitor']['altitude'].read()[0] / 1e3
-            send_log("response: Altitude - {}".format(altitude))
-            altitude_publisher.publish(altitude)
-        except:
-            pass
-
-        if navSystem == 0:
+while not rospy.is_shutdown():
+    if not restart:
+        if ((messenger == None) and not live):
             try:
-                send_log("send: Global position request")
-                global_point = PointGPS()
-                global_point.latitude = messenger.hub['Ublox']['latitude'].read()[0] / 1e7
-                global_point.longitude = messenger.hub['Ublox']['longitude'].read()[0] / 1e7
-                global_point.altitude = messenger.hub['Ublox']['altitude'].read()[0] / 1e3
-                send_log("response: Global position - [{}, {}, {}]".format(global_point.latitude,global_point.longitude,global_point.altitude))
-                global_position_publisher.publish(global_point)
-
-                send_log("send: Mag request")
-                mag = Point()
-                mag.x = messenger.hub['SensorMonitor']['magX'].read()[0] / 1e3
-                mag.y = messenger.hub['SensorMonitor']['magY'].read()[0] / 1e3
-                mag.z = messenger.hub['SensorMonitor']['magZ'].read()[0] / 1e3
-                send_log("response: Mag - [{}, {}, {}]".format(mag.x,mag.y,mag.z))
-                mag_publisher.publish(mag)
-
-                sat = SatellitesGPS()
-                try:
-                    sat.gps = messenger.hub['Ublox']['satGps'].read()[0]
-                except:
-                    sat.gps = 0
-
-                try:
-                    sat.glonass = messenger.hub['Ublox']['satGlonass'].read()[0]
-                except:
-                    sat.glonass = 0
-                satellites_publisher.publish(sat)
-
-                send_log("send: Global status")
-                status = messenger.hub['Ublox']['status'].read()[0]
-                send_log("response: Global status - {}".format(status))
-                global_status_publisher.publish(status)
-
-            except:
-                rospy.logerr("Gnns Module not found")
-                send_log("error: Gnns Module not found")
+                send_log("try to connect")
+                rospy.loginfo("Try to connect ...")
+                messenger = Messenger(SerialStream(UART, 57600))
+                messenger.connect()
+                init()
+            except ValueError:
+                rospy.logfatal("Serial port not specified")
                 break
-        elif navSystem == 1:
-            try:
-                send_log("send: Local position request")
-                local_point = Point()
-                local_point.x = messenger.hub['USNav_module']['x'].read()[0] * 0.001
-                local_point.y = messenger.hub['USNav_module']['y'].read()[0] * 0.001
-                local_point.z = messenger.hub['USNav_module']['z'].read()[0] * 0.001
-                send_log("response: Local position - [{}, {}, {}]".format(local_point.x,local_point.y,local_point.z))
-                local_position_publisher.publish(local_point)
-
-                send_log("send: LPS yaw request")
-                yaw=messenger.hub['USNav_module']['yaw'].read()[0]
-                send_log("response: LPS yaw - {}".format(yaw))
-                local_yaw_publisher.publish(yaw)
-
-                send_log("send: LPS velocity request")
-                lps_vel = Point()
-                lps_vel.x = messenger.hub['USNav_module']['velX'].read()[0]
-                lps_vel.y = messenger.hub['USNav_module']['velY'].read()[0]
-                lps_vel.z = messenger.hub['USNav_module']['velZ'].read()[0]
-                send_log("response: LPS velocity - [{}, {}, {}]".format(lps_vel.x,lps_vel.y,lps_vel.z))
-                local_velocity_publisher.publish(lps_vel)
             except:
-                rospy.logerr("LPS not found")
-                send_log("error: LPS not found")
-                break
-        elif navSystem == 2:
-            try:
-                send_log("send: OpticalFlow velocity request")
-                velocity = OptVelocity()
-                velocity.x = messenger.hub['SensorMonitor']['optFlowX'].read()[0]
-                velocity.y = messenger.hub['SensorMonitor']['optFlowY'].read()[0]
-                velocity.range = messenger.hub['SensorMonitor']['optFlowRange'].read()[0] / 1e3
-                send_log("response: OpticalFlow velocity - [{}, {}, {}]".format(velocity.x,velocity.y,velocity.range))
-                opt_velocity_publisher.publish(velocity)
-            except:
-                rospy.logerr("OpticalFlow Module not found")
-                send_log("error: OpticalFlow Module not found")
-                break
-        sleep(0.01)
-messenger.stop()
-stream.socket.close()
+                messenger = None
+                send_log("board: offline")
+                rospy.loginfo("Board is offline")
+        else:
+            data_exchange()
+live = False
+disconnect()
