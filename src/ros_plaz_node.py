@@ -15,9 +15,9 @@ from gs_interfaces.srv import Info,InfoResponse
 from gs_interfaces.srv import NavigationSystem,NavigationSystemResponse
 from gs_interfaces.srv import Position,PositionResponse
 from gs_interfaces.srv import PositionGPS,PositionGPSResponse
-from gs_interfaces.srv import Cargo, CargoResponse
 from gs_interfaces.srv import Yaw, YawResponse
-from gs_interfaces.msg import SimpleBatteryState,PointGPS,OptVelocity,Orientation,SatellitesGPS
+from gs_interfaces.srv import ParametersList, ParametersListResponse
+from gs_interfaces.msg import SimpleBatteryState,PointGPS,OptVelocity,Orientation,SatellitesGPS, Parameter
 from std_msgs.msg import String,Float32,ColorRGBA,Int32,Int8
 from geometry_msgs.msg import Point
 
@@ -39,6 +39,7 @@ state_module_led=[]
 navSystem = 0
 navSystemName = {0:"GPS", 1:"LPS", 2:"OPT"}
 global_point_seq = 0
+autopilot_params = []
 
 def handle_event(req):
     global messenger
@@ -208,14 +209,9 @@ def handle_navSys(req):
     global navSystemName
     return NavigationSystemResponse(navSystemName[navSystem])
 
-def handle_cargo(req):
-    global messenger
-    try:
-        send_log("send: Cargo state - {}".format(req.state))
-        messenger.hub['LedBar']['cargo'].write(req.state)
-        return CargoResponse(True)
-    except:
-        return CargoResponse(False)
+def handle_autopilot_params(req):
+    global autopilot_params
+    return ParametersListResponse(autopilot_params)
 
 def on_fields_changed(device, fields):
     global messenger
@@ -235,12 +231,11 @@ def on_fields_changed(device, fields):
 logger = Service("geoscan/get_log",Log,handle_log)
 alive = Service("geoscan/alive",Live,handle_live)
 
-cargo = Service("geoscan/cargo/set",Cargo,handle_cargo)
-
 info_service = Service("geoscan/board/get_info",Info,handle_info)
 time_service = Service("geoscan/board/get_time",Time,handle_time)
 uptime_service = Service("geoscan/board/get_uptime",Time,handle_uptime)
 flight_time_service = Service("geoscan/board/get_flight_time",Time,handle_flight_time)
+autopilot_params_service = Service("geoscan/board/get_parameters",ParametersList,handle_autopilot_params)
 
 navigation_service = Service("geoscan/navigation/get_system",NavigationSystem,handle_navSys)
 
@@ -286,12 +281,16 @@ if messenger.hub.model == 12:
     while not rospy.is_shutdown():
         try:
             for i in range(0,messenger.hub.getParamCount()):
-                param = messenger.hub.getParam(i)
-                if param[0] == 'Flight_com_navSystem':
-                    navSystem = int(param[1])
+                parameter = Parameter()
+                string, parameter.value = messenger.hub.getParam(i)
+                parameter.name = String(string)
+                if parameter.name.data == 'Flight_com_navSystem':
+                    navSystem = int(parameter.value)
+                autopilot_params.append(parameter)
             break
         except:
             pass
+
     for _ in range(0,4):
             state_board_led.append(ColorRGBA())
 
@@ -400,9 +399,9 @@ if messenger.hub.model == 12:
             try:
                 send_log("send: Local position request")
                 local_point = Point()
-                local_point.x = messenger.hub['USNav_module']['x'].read()[0]
-                local_point.y = messenger.hub['USNav_module']['y'].read()[0]
-                local_point.z = messenger.hub['USNav_module']['z'].read()[0]
+                local_point.x = messenger.hub['USNav_module']['x'].read()[0] * 0.001
+                local_point.y = messenger.hub['USNav_module']['y'].read()[0] * 0.001
+                local_point.z = messenger.hub['USNav_module']['z'].read()[0] * 0.001
                 send_log("response: Local position - [{}, {}, {}]".format(local_point.x,local_point.y,local_point.z))
                 local_position_publisher.publish(local_point)
 
