@@ -19,6 +19,7 @@
 * port(string) - имя UART порта (пример: /dev/ttyS0), обязательный параметр 
 
 #### Сервисы:
+* geoscab/restart (std_srvs/Empty) - перезагружает базовую Плату Пионер
 * geoscan/alive (gs_interfaces/Live) - возвращает статус соединения
 * geoscan/get_log (gs_interfaces/Log) - возвращает лог
 * geoscan/flight/set_event (gs_interfaces/Event) - приказывает автопилоту выполнить Event
@@ -62,6 +63,7 @@
     * gs_interfaces
     * geometry_msgs
     * std_msgs
+    * std_srvs
 
 ## Использование:
  ```rosparam set ros_plaz_node/port /dev/ttyS0```
