@@ -13,10 +13,12 @@ from gs_interfaces.srv import Event,EventResponse
 from gs_interfaces.srv import Time,TimeResponse
 from gs_interfaces.srv import Info,InfoResponse
 from gs_interfaces.srv import NavigationSystem,NavigationSystemResponse
+from gs_interfaces.srv import SetNavigationSystem,SetNavigationSystemResponse
 from gs_interfaces.srv import Position,PositionResponse
 from gs_interfaces.srv import PositionGPS,PositionGPSResponse
 from gs_interfaces.srv import Yaw, YawResponse
 from gs_interfaces.srv import ParametersList, ParametersListResponse
+from gs_interfaces.srv import SetParametersList, SetParametersListResponse
 from gs_interfaces.msg import SimpleBatteryState,PointGPS,OptVelocity,Orientation,SatellitesGPS, Parameter
 from std_msgs.msg import String,Float32,ColorRGBA,Int32,Int8
 from geometry_msgs.msg import Point
@@ -31,10 +33,64 @@ UART = rospy.get_param(rospy.search_param("port"))
 log = []
 live = False
 restart = False
+change_navSystem = False
 
 event_messages = (10, 12, 23, 2)
 callback_event_messages = (255, 26, 31, 32, 42, 43, 51, 56, 65)
 navSystemName = {0:"GPS", 1:"LPS", 2:"OPT"}
+navSystemParam = {
+    "GPS": [
+        Parameter("BoardPioneer_modules_gnss", 1.0),
+        Parameter("Imu_magEnabled", 1),
+        Parameter("SensorMux_gnss", 255.0),
+        Parameter("Copter_man_velScale", 5),
+        Parameter("Copter_man_vzScale", 5),
+        Parameter("Copter_pos_vDesc", 0.7),
+        Parameter("Copter_pos_vDown", 1),
+        Parameter("Copter_pos_vLanding", 0.5),
+        Parameter("Copter_pos_vMax", 2),
+        Parameter("Copter_pos_vTakeoff", 0.5),
+        Parameter("Copter_pos_vUp", 1),
+        Parameter("Flight_com_homeAlt", 1.5),
+        Parameter("Flight_com_landingAlt", 1),
+        Parameter("Flight_com_navSystem", 0),
+        Parameter("State_startCount", 92)
+    ],
+    "LPS": [
+        Parameter("BoardPioneer_modules_gnss", 0),
+        Parameter("Imu_magEnabled", 0.0),
+        Parameter("SensorMux_gnss", 0.0),
+        Parameter("Copter_man_velScale", 0.5),
+        Parameter("Copter_man_vzScale", 0.5),
+        Parameter("Copter_pos_vDesc", 0.4),
+        Parameter("Copter_pos_vDown", 0.7),
+        Parameter("Copter_pos_vLanding", 0.3),
+        Parameter("Copter_pos_vMax", 1),
+        Parameter("Copter_pos_vTakeoff", 0.3),
+        Parameter("Copter_pos_vUp", 0.5),
+        Parameter("Flight_com_homeAlt", 0.5),
+        Parameter("Flight_com_landingAlt", 0),
+        Parameter("Flight_com_navSystem", 1),
+        Parameter("State_startCount", 90)
+    ],
+    "OPT": [
+        Parameter("BoardPioneer_modules_gnss", 0.0),
+        Parameter("Imu_magEnabled", 0),
+        Parameter("SensorMux_gnss", 0.0),
+        Parameter("Copter_man_velScale", 0.5),
+        Parameter("Copter_man_vzScale", 0.5),
+        Parameter("Copter_pos_vDesc", 0.4),
+        Parameter("Copter_pos_vDown", 0.5),
+        Parameter("Copter_pos_vLanding", 0.3),
+        Parameter("Copter_pos_vMax", 0.4),
+        Parameter("Copter_pos_vTakeoff", 0.3),
+        Parameter("Copter_pos_vUp", 0.5),
+        Parameter("Flight_com_homeAlt", 0.5),
+        Parameter("Flight_com_landingAlt", 0),
+        Parameter("Flight_com_navSystem", 2),
+        Parameter("State_startCount", 93)
+    ]
+}
 
 state_event = -1
 state_callback_event = 0
@@ -61,6 +117,14 @@ def disconnect():
         messenger.stop()
         messenger.handler.stream.socket.close()
         messenger = None
+
+def navSystem_except(name, restart):
+    global live
+    if not restart:
+        live = False
+        rospy.logerr(f"{name} not found")
+        send_log(f"error: {name} not found")
+        disconnect()
 
 def restart_board():
     global live
@@ -237,14 +301,49 @@ def handle_info(req):
         pass
     return InfoResponse("error")
 
-def handle_navSys(req):
+def handle_get_navigation_system(req):
     global navSystem
     global navSystemName
     return NavigationSystemResponse(navSystemName[navSystem])
 
-def handle_autopilot_params(req):
+def handle_set_navigation_system(req):
+    global messenger
+    global navSystemParam
+    global live
+    live = False
+    for param in navSystemParam[req.navigation]:
+        try:
+            messenger.hub.setParam(name=param.name, value=param.value)
+        except:
+            pass
+    rospy.loginfo("Changing the navigation system ...")
+    disconnect()
+    return SetNavigationSystemResponse(True)
+
+def handle_get_autopilot_params(req):
     global autopilot_params
     return ParametersListResponse(autopilot_params)
+
+def handle_set_autopilot_params(req):
+    global autopilot_params
+    global messenger
+    try:
+        for param in req.params:
+            exist = False
+            for ap_param in autopilot_params:
+                if ap_param.name == param.name:
+                    if ap_param.value != param.value:
+                        messenger.hub.setParam(name=param.name, value=param.value)
+                    else:
+                        rospy.logwarn(f"The value of the {param.name} parameter is equal to the desired value")
+                    exist = True
+                    break
+            if not exist:
+                rospy.logwarn(f"{param.name} parameter does not exist")
+    except:
+        return SetParametersListResponse(False)
+    get_param_from_ap()     
+    return SetParametersListResponse(True)
 
 def on_fields_changed(device, fields):
     global messenger
@@ -254,29 +353,37 @@ def on_fields_changed(device, fields):
     if messenger.hub[device].name == 'FlightManager':
         event = messenger.hub['FlightManager']['event'].value
         messenger.hub['FlightManager']['event'].write(value=event,callback=None, blocking=False)
-        if event != state_callback_event:
+        if ((event != state_callback_event) and (event != 255)):
             callback_event_publisher.publish(callback_event_messages.index(event))
             state_callback_event = event
     elif messenger.hub[device].name == 'UavMonitor':
         if messenger.hub['UavMonitor']['mode'].value == 2:
             messenger.hub['FlightManager']['event'].write(value=255,callback=None, blocking=False)
+            if state_callback_event != 255:
+                state_callback_event = 255
+                callback_event_publisher.publish(callback_event_messages.index(state_callback_event))
+
+def get_param_from_ap():
+    global messenger
+    global autopilot_params
+    global navSystem
+    try:
+        autopilot_params = []
+        for i in range(0, messenger.hub.getParamCount()):
+            parameter = Parameter()
+            parameter.name, parameter.value = messenger.hub.getParam(i)
+            if parameter.name == '':
+                navSystem = int(parameter.value)
+            autopilot_params.append(parameter)
+    except:
+        disconnect()
 
 def init():
     global live
     global messenger
-    global navSystem
-    global autopilot_params
+    
     if ((messenger.hub.model == 12) and not live):
-        try:
-            for i in range(0, messenger.hub.getParamCount()):
-                parameter = Parameter()
-                string, parameter.value = messenger.hub.getParam(i)
-                parameter.name = String(string)
-                if parameter.name.data == 'Flight_com_navSystem':
-                    navSystem = int(parameter.value)
-                autopilot_params.append(parameter)
-        except:
-            disconnect()
+        get_param_from_ap()
 
         for _ in range(0,4):
             state_board_led.append(ColorRGBA())
@@ -284,9 +391,9 @@ def init():
         for _ in range(0,25):
             state_module_led.append(ColorRGBA())
 
-        messenger.hub.onFieldsChanged = on_fields_changed
         messenger.hub['FlightManager']['event'].write(255)
         messenger.hub['LedBar']['color'].write(0 | (0 << 8) | (0 << 16) | (255 << 24) )
+        messenger.hub.onFieldsChanged = on_fields_changed
 
         rospy.loginfo("Board start connect - done")
         live = True
@@ -395,12 +502,12 @@ def data_exchange():
                     send_log("response: Global status - {}".format(status))
                     global_status_publisher.publish(status)
 
+                except TypeError as e:
+                    rospy.logerr(str(e))
+                    rospy.loginfo("Restarting to activate Gnns module")
+                    restart_board()
                 except:
-                    if not restart:
-                        live = False
-                        rospy.logerr("Gnns Module not found")
-                        send_log("error: Gnns Module not found")
-                        disconnect()
+                    navSystem_except("Gnns Module", restart)
             elif navSystem == 1:
                 try:
                     send_log("send: Local position request")
@@ -412,7 +519,7 @@ def data_exchange():
                     local_position_publisher.publish(local_point)
 
                     send_log("send: LPS yaw request")
-                    yaw=messenger.hub['USNav_module']['yaw'].read()[0]
+                    yaw = messenger.hub['USNav_module']['yaw'].read()[0]
                     send_log("response: LPS yaw - {}".format(yaw))
                     local_yaw_publisher.publish(yaw)
 
@@ -423,12 +530,11 @@ def data_exchange():
                     lps_vel.z = messenger.hub['USNav_module']['velZ'].read()[0]
                     send_log("response: LPS velocity - [{}, {}, {}]".format(lps_vel.x,lps_vel.y,lps_vel.z))
                     local_velocity_publisher.publish(lps_vel)
+                except TypeError:
+                    rospy.loginfo("Restarting to activate LPS module")
+                    restart_board()
                 except:
-                    if not restart:
-                        live = False
-                        rospy.logerr("LPS not found")
-                        send_log("error: LPS not found")
-                        disconnect()
+                    navSystem_except("LPS", restart)
             elif navSystem == 2:
                 try:
                     send_log("send: OpticalFlow velocity request")
@@ -439,18 +545,13 @@ def data_exchange():
                     send_log("response: OpticalFlow velocity - [{}, {}, {}]".format(velocity.x,velocity.y,velocity.range))
                     opt_velocity_publisher.publish(velocity)
                 except:
-                    if not restart:
-                        live = False
-                        rospy.logerr("OpticalFlow Module not found")
-                        send_log("error: OpticalFlow Module not found")
-                        disconnect()
+                    navSystem_except("OpticalFlow Module", restart)
         else:
             live = False
             disconnect()
     else:
         live = False
 
-restart_service = Service("geoscan/restart", Empty, handle_restart)
 logger = Service("geoscan/get_log",Log,handle_log)
 alive = Service("geoscan/alive",Live,handle_live)
 
@@ -458,9 +559,12 @@ info_service = Service("geoscan/board/get_info",Info,handle_info)
 time_service = Service("geoscan/board/get_time",Time,handle_time)
 uptime_service = Service("geoscan/board/get_uptime",Time,handle_uptime)
 flight_time_service = Service("geoscan/board/get_flight_time",Time,handle_flight_time)
-autopilot_params_service = Service("geoscan/board/get_parameters",ParametersList,handle_autopilot_params)
+get_autopilot_params_service = Service("geoscan/board/get_parameters",ParametersList,handle_get_autopilot_params)
+set_autopilot_params_service = Service("geoscan/board/set_parameters",SetParametersList,handle_set_autopilot_params)
+restart_service = Service("geoscan/board/restart", Empty, handle_restart)
 
-navigation_service = Service("geoscan/navigation/get_system",NavigationSystem,handle_navSys)
+get_navigation_service = Service("geoscan/navigation/get_system",NavigationSystem,handle_get_navigation_system)
+set_navigation_service = Service("geoscan/navigation/set_system",SetNavigationSystem,handle_set_navigation_system)
 
 local_position_service = Service("geoscan/flight/set_local_position",Position,handle_local_pos)
 global_position_service = Service("geoscan/flight/set_global_position",PositionGPS,handle_gps_pos)

@@ -19,7 +19,6 @@
 * port(string) - имя UART порта (пример: /dev/ttyS0), обязательный параметр 
 
 #### Сервисы:
-* geoscab/restart (std_srvs/Empty) - перезагружает базовую Плату Пионер
 * geoscan/alive (gs_interfaces/Live) - возвращает статус соединения
 * geoscan/get_log (gs_interfaces/Log) - возвращает лог
 * geoscan/flight/set_event (gs_interfaces/Event) - приказывает автопилоту выполнить Event
@@ -33,7 +32,10 @@
 * geoscan/board/get_uptime (gs_interfaces/Time) - возвращает время запуска для системы навигации
 * geoscan/board/get_flight_time (gs_interfaces/Time) - возвращает время с начала полета
 * geoscan/board/get_parameters (gs_interface/ParametersList) - возварщает параметры АП
+* geoscan/board/set_parameters (gs_interface/SetParametersList) - устанавливает параметры АП
+* geoscan/board/restart (std_srvs/Empty) - перезагружает базовую Плату Пионер
 * geoscan/navigation/get_system (gs_interfaces/NavigationSystem) - возвращает текущую систему позиционирования
+* geoscan/navigation/set_system (gs_interfaces/SetNavigationSystem) - устанавливает систему позиционирования
 
 #### Топики:
 * geoscan/log (std_msgs/String) - последнее сообщение лога
