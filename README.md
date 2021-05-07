@@ -32,7 +32,10 @@
 * geoscan/board/get_uptime (gs_interfaces/Time) - возвращает время запуска для системы навигации
 * geoscan/board/get_flight_time (gs_interfaces/Time) - возвращает время с начала полета
 * geoscan/board/get_parameters (gs_interface/ParametersList) - возварщает параметры АП
+* geoscan/board/set_parameters (gs_interface/SetParametersList) - устанавливает параметры АП
+* geoscan/board/restart (std_srvs/Empty) - перезагружает базовую Плату Пионер
 * geoscan/navigation/get_system (gs_interfaces/NavigationSystem) - возвращает текущую систему позиционирования
+* geoscan/navigation/set_system (gs_interfaces/SetNavigationSystem) - устанавливает систему позиционирования
 
 #### Топики:
 * geoscan/log (std_msgs/String) - последнее сообщение лога
@@ -62,6 +65,7 @@
     * gs_interfaces
     * geometry_msgs
     * std_msgs
+    * std_srvs
 
 ## Использование:
  ```rosparam set ros_plaz_node/port /dev/ttyS0```
