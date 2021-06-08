@@ -372,7 +372,7 @@ def get_param_from_ap():
         for i in range(0, messenger.hub.getParamCount()):
             parameter = Parameter()
             parameter.name, parameter.value = messenger.hub.getParam(i)
-            if parameter.name == '':
+            if parameter.name == 'Flight_com_navSystem':
                 navSystem = int(parameter.value)
             autopilot_params.append(parameter)
     except:
