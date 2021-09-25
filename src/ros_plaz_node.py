@@ -24,20 +24,19 @@ from std_msgs.msg import String,Float32,ColorRGBA,Int32,Int8
 from geometry_msgs.msg import Point
 from std_srvs.srv import Empty, EmptyResponse
 
-rospy.init_node("ros_plaz_node")
+rospy.init_node("ros_plaz_node") # инициализируем ноду
 
-TIME_FOR_RESTART = 5
+TIME_FOR_RESTART = 5 # приблизительное время необходимое для перезапуска платы
 
-UART = rospy.get_param(rospy.search_param("port"))
+UART = rospy.get_param(rospy.search_param("port")) # получение имени порта, как параметра ноды
 
-log = []
-live = False
-restart = False
-change_navSystem = False
+log = [] # массив, хранящий все сообщения лога
+live = False # состояние подключение к базовой платы АП
+restart = False # состояние перезапуска
 
-event_messages = (10, 12, 23, 2)
-callback_event_messages = (255, 26, 31, 32, 42, 43, 51, 56, 65)
-navSystemName = {0:"GPS", 1:"LPS", 2:"OPT"}
+event_messages = (10, 12, 23, 2) # доступные события(команды) АП
+callback_event_messages = (255, 26, 31, 32, 42, 43, 51, 56, 65) # события, возвращаемые АП
+navSystemName = {0:"GPS", 1:"LPS", 2:"OPT"} # доступные системы позиционирования
 navSystemParam = {
     "GPS": [
         Parameter("BoardPioneer_modules_gnss", 1.0),
@@ -92,111 +91,111 @@ navSystemParam = {
     ]
 }
 
-state_event = -1
-state_callback_event = 0
-state_position = [0., 0., 0., 0.]
-state_gps_position = [0., 0., 0.]
-state_board_led=[]
-state_module_led=[]
-navSystem = 0
-global_point_seq = 0
-autopilot_params = []
+state_event = -1 # последнеее событие, отправленное в АП
+state_callback_event = 0 # полседнее событие пришедшее от АП
+state_position = [0., 0., 0., 0.] # последняя точка, на которую был отправлен коптер (в локальных координатах)
+state_gps_position = [0., 0., 0.] # последняя координата, нак оторую был отправлен коптер (в глобальных координатах)
+state_board_led=[] # текущее состояние светодиодов на базовой плате
+state_module_led=[] # текущее состояние светодиодов на Led-модуле
+navSystem = 0 # текущая система позиционирования
+global_point_seq = 0 # номер точки в глобальной системе
+autopilot_params = [] # выгруженные параметры АП
 
-messenger = None
+messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
 
-def send_log(msg):
+def send_log(msg): # функция отправки сообщения в лог
     global log
     global logger_publisher
     msg = f"[{time()}] {msg}"
     log.append(msg)
-    logger_publisher.publish(msg)
+    logger_publisher.publish(msg) # публикуем сообщения лога в топик logger
 
-def disconnect():
+def disconnect(): # функция разрыва коммуникации между RPi и базовой платой
     global messenger
     if messenger != None:
-        messenger.stop()
-        messenger.handler.stream.socket.close()
-        messenger = None
+        messenger.stop() # останвливаем поток сообщений
+        messenger.handler.stream.socket.close() # закрываем порт
+        messenger = None # обнуляем messenger
 
-def navSystem_except(name, restart):
+def navSystem_except(name, restart): # обработка исключения при ошибки связи с модулями навигации
     global live
-    if not restart:
-        live = False
+    if not restart: # проверяем не идет ли перезагрузка платы
+        live = False # устанавливаем состояние подключения
         rospy.logerr(f"{name} not found")
         send_log(f"error: {name} not found")
-        disconnect()
+        disconnect() # разрываем подключение, чтобы вызвать переподключение к плате
 
-def restart_board():
+def restart_board(): # функция перезагрузки платы
     global live
     global messenger
     global restart
     send_log("restart board - start")
-    restart = True
-    live = False
+    restart = True # устанавливаем статус перезапуска
+    live = False # устанавливаем состояние подключения
     rospy.loginfo("Restarting board ...")
-    messenger.hub.sendCommand(18)
-    disconnect()
-    sleep(TIME_FOR_RESTART)
+    messenger.hub.sendCommand(18) # отправляем команду на перезапуск платы
+    disconnect() # разрываем подключение
+    sleep(TIME_FOR_RESTART) # ожидание перезагрузки
     send_log("restart board - finish")
     rospy.loginfo("Restart board - done")
-    restart = False
+    restart = False # устанавливаем статус перезапуска
 
-def handle_live(req):
+def handle_live(request): # функция обработки запроса статуса подключения
     global live
-    return live
+    return live # возвращаем состояние подключения
 
-def handle_restart(req):
-    restart_board()
-    return EmptyResponse()
+def handle_restart(request): # функция обработки запроса на перезагрузку
+    restart_board() # перезапускам плату
+    return EmptyResponse() # возвращаем пустой ответ 
 
-def handle_event(req):
+def handle_event(request): # функция обработки запроса на отправление события в АП
     global messenger
     global state_event
     global event_messages
     try:
-        if state_event != req.event:
-            send_log(f"send: Event - {req.event}")
-            messenger.hub['UavMonitor']['mode'].write(event_messages[req.event])
-            state_event = req.event
+        if state_event != request.event: # проверяем на совпадение предыдущее событие с событием из запроса
+            send_log(f"send: Event - {request.event}")
+            messenger.hub['UavMonitor']['mode'].write(event_messages[request.event]) # записываем событие в АП
+            state_event = request.event # присваиваем событие из запроса в предыдущее событие
     except:
-        return EventResponse(0)
-    return EventResponse(1)
+        return EventResponse(0) # если произошла ошибка записи, то отправляем ответом код ошибки 0
+    return EventResponse(1) # отправляем 1 - команда отправлена
 
-def handle_local_pos(req):
+def handle_local_pos(request): # функция обработки запроса на полет в локальную точку
     global state_position
     global messenger
-    request_position = [req.position.x,req.position.y,req.position.z]
+    request_position = [request.position.x, request.position.y, request.position.z] # запоминаем координаты точки из запроса
     try:
-        if request_position != state_position:
-            send_log(f"send: go to local point - x: {request_position[0]}, y: {request_position[1]}, z: {request_position[2]}, time: {req.time}")
-            fields = {}
-            fields['id'] = Message.GOTO_LOCAL_POINT
-            fields['x'] = int(request_position[0] * 1e3 )
-            fields['y'] = int(request_position[1] * 1e3 )
-            fields['z'] = int(request_position[2] * 1e3 )
-            fields['time'] = int(req.time)
-            messenger.invokeAsync(packet=fields)
-            state_position = request_position
+        if request_position != state_position: # сравниваем координаты точки с предыдущими координатами
+            send_log(f"send: go to local point - x: {request_position[0]}, y: {request_position[1]}, z: {request_position[2]}, time: {request.time}")
+            fields = {} # объявляем тело запроса в АП
+            fields['id'] = Message.GOTO_LOCAL_POINT # присваиваем тип сообщения
+            fields['x'] = int(request_position[0] * 1e3 ) # присваиваем координату x с переводом из метров в милимметры
+            fields['y'] = int(request_position[1] * 1e3 ) # присваиваем координату y с переводом из метров в милимметры
+            fields['z'] = int(request_position[2] * 1e3 ) # присваиваем координату z с переводом из метров в милимметры
+            fields['time'] = int(request.time) # присваиваем время перелета
+            messenger.invokeAsync(packet=fields) # отправляем запрос в АП
+            state_position = request_position # присваиваем предудщей координате запрошенную
     except:
-        return PositionResponse(False)
-    return PositionResponse(True)
+        return PositionResponse(False) # если произошла ошибка отправки возвращаем код ошибки
+    return PositionResponse(True) # возвращаем True - 
 
-def handle_gps_pos(req):
+def handle_gps_pos(request): # функция обработки запроса на полет в точку в глобальных системах координат
     global state_gps_position
     global global_point_seq
     global messenger
-    request_position = [req.position.latitude,req.position.longitude,req.position.altitude]
+    request_position = [request.position.latitude, request.position.longitude, request.position.altitude] # запоминаем координаты точки из запроса
     try:
-        if request_position != state_gps_position:
-            callback = lambda packet: proto.listen(Message.GO_TO_POINT_RESPONSE, packet)
+        if request_position != state_gps_position: # сравниваем координаты точки с предыдущими координатами
+            callback = lambda packet: proto.listen(Message.GO_TO_POINT_RESPONSE, packet) # объявляем функцию обработки ответа АП
             send_log(f"send: go to global position - latitude: {request_position[0]} , longitude: {request_position[1]} altitude: {request_position[2]}")
-            fields = {}
-            fields['id'] = Message.GO_TO_POINT_V2
-            fields['sequence'] = global_point_seq
-            fields['latitude'] = int(request_position[0] * 1e7)
-            fields['longitude'] = int(request_position[1] * 1e7)
-            fields['altitude'] = int(request_position[2] * 1e2)
-            fields['yaw'] = 0
+            fields = {} # объявляем тело запроса в АП
+            fields['id'] = Message.GO_TO_POINT_V2 # присваиваем тип сообщения
+            fields['sequence'] = global_point_seq # устанвливаем номер точки
+            fields['latitude'] = int(request_position[0] * 1e7) # присваиваем широту
+            fields['longitude'] = int(request_position[1] * 1e7) # присваиваем долготу
+            fields['altitude'] = int(request_position[2] * 1e2) # присваиваем высоту над уровнем моря
+            fields['yaw'] = 0 # устанавливаем рысканье
             fields['flags'] = 0
             fields['type'] = 3
             fields['duration'] = 0
@@ -216,48 +215,48 @@ def handle_gps_pos(req):
         return PositionGPSResponse(False)
     return PositionGPSResponse(True)
 
-def handle_yaw(req):
+def handle_yaw(request):
     global messenger
     try:
-        send_log(f"send: update yaw - angle:{req.angle}")
-        messenger.hub['ManualControl']['yawManual'].write(int(req.angle * 100.0))
+        send_log(f"send: update yaw - angle:{request.angle}")
+        messenger.hub['ManualControl']['yawManual'].write(int(request.angle * 100.0))
     except:
         return YawResponse(False)
     return YawResponse(True)
 
-def handle_board_led(req): # Module_lua = 0
+def handle_board_led(request): # Module_lua = 0
     global messenger
     global state_board_led
     try:
-        if req.leds != state_board_led:
-            for i in range(0, len(req.leds)):
-                if req.leds[i] != state_board_led[i]:
-                    send_log(f"send: change board leds color - n:{i}, r: {req.leds[i].r}, g: {req.leds[i].g}, b: {req.leds[i].b}")
-                    messenger.hub['LedBar']['color'].write( int(req.leds[i].r) | (int(req.leds[i].g) << 8) | (int(req.leds[i].b) << 16) | (i << 24) )
-                    state_board_led[i] = req.leds[i]
+        if request.leds != state_board_led:
+            for i in range(0, len(request.leds)):
+                if request.leds[i] != state_board_led[i]:
+                    send_log(f"send: change board leds color - n:{i}, r: {request.leds[i].r}, g: {request.leds[i].g}, b: {request.leds[i].b}")
+                    messenger.hub['LedBar']['color'].write( int(request.leds[i].r) | (int(request.leds[i].g) << 8) | (int(request.leds[i].b) << 16) | (i << 24) )
+                    state_board_led[i] = request.leds[i]
     except:
         return LedResponse(False)
     return LedResponse(True)
 
-def handle_module_led(req):
+def handle_module_led(request):
     global messenger
     global state_module_led
     try:
-        if req.leds != state_module_led:
-            for i in range(4, len(req.leds)+4):
-                if req.leds[i] != state_module_led[i]:
-                    send_log(f"send: change module leds color - n:{i}, r: {req.leds[i].r}, g: {req.leds[i].g}, b: {req.leds[i].b}")
-                    messenger.hub['LedBar']['color'].write( int(req.leds[i].r) | (int(req.leds[i].g) << 8) | (int(req.leds[i].b) << 16) | (i << 24) )
-                    state_module_led[i] = req.leds[i]
+        if request.leds != state_module_led:
+            for i in range(4, len(request.leds)+4):
+                if request.leds[i] != state_module_led[i]:
+                    send_log(f"send: change module leds color - n:{i}, r: {request.leds[i].r}, g: {request.leds[i].g}, b: {request.leds[i].b}")
+                    messenger.hub['LedBar']['color'].write( int(request.leds[i].r) | (int(request.leds[i].g) << 8) | (int(request.leds[i].b) << 16) | (i << 24) )
+                    state_module_led[i] = request.leds[i]
     except:
         return LedResponse(False)
     return LedResponse(True)
 
-def handle_log(req):
+def handle_log(request):
     global log
     return LogResponse(log)
 
-def handle_time(req):
+def handle_time(request):
     global messenger
     try:
         send_log("send: time request")
@@ -268,7 +267,7 @@ def handle_time(req):
         pass
     return TimeResponse(0.)
 
-def handle_uptime(req):
+def handle_uptime(request):
     global messenger
     try:
         send_log("send: uptime request")
@@ -279,7 +278,7 @@ def handle_uptime(req):
         pass
     return TimeResponse(0.)
 
-def handle_flight_time(req):
+def handle_flight_time(request):
     global messenger
     try:
         send_log("send: flight time request")
@@ -290,7 +289,7 @@ def handle_flight_time(req):
         pass
     return TimeResponse(0.)
 
-def handle_info(req):
+def handle_info(request):
     global messenger
     try:
         send_log("send: board number request")
@@ -301,17 +300,17 @@ def handle_info(req):
         pass
     return InfoResponse("error")
 
-def handle_get_navigation_system(req):
+def handle_get_navigation_system(request):
     global navSystem
     global navSystemName
     return NavigationSystemResponse(navSystemName[navSystem])
 
-def handle_set_navigation_system(req):
+def handle_set_navigation_system(request):
     global messenger
     global navSystemParam
     global live
     live = False
-    for param in navSystemParam[req.navigation]:
+    for param in navSystemParam[request.navigation]:
         try:
             messenger.hub.setParam(name=param.name, value=param.value)
         except:
@@ -320,15 +319,15 @@ def handle_set_navigation_system(req):
     disconnect()
     return SetNavigationSystemResponse(True)
 
-def handle_get_autopilot_params(req):
+def handle_get_autopilot_params(request):
     global autopilot_params
     return ParametersListResponse(autopilot_params)
 
-def handle_set_autopilot_params(req):
+def handle_set_autopilot_params(request):
     global autopilot_params
     global messenger
     try:
-        for param in req.params:
+        for param in request.params:
             exist = False
             for ap_param in autopilot_params:
                 if ap_param.name == param.name:
