@@ -27,7 +27,7 @@ from std_srvs.srv import Empty, EmptyResponse
 TIME_FOR_RESTART = 5 # приблизительное время необходимое для перезапуска платы
 
 class ROSPlazNode(): # класс ноды ros_plaz_node
-    def __init__(self, uart="/dev/ttyS0"):
+    def __init__(self, uart="/dev/ttyS0", rate = None):
         self.navSystemParam = { # параметры необходимые для изменения систем позиционирования
             "GPS": [
                 Parameter("BoardPioneer_modules_gnss", 1.0),
@@ -99,6 +99,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.global_point_seq = 0 # номер точки в глобальной системе
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
+        self.rate = rate # таймер
 
         self.logger = Service("geoscan/get_log",Log, self.handle_log) # сервис логов
         self.alive = Service("geoscan/alive", Live, self.handle_live) # сервис, показывающий состояние подключения
@@ -554,6 +555,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     rospy.loginfo("Board is offline")
             else:
                 self.data_exchange()
+        if self.rate is not None:
+            self.rate.sleep()
         return True
 
 if __name__ == "__main__":
@@ -562,7 +565,10 @@ if __name__ == "__main__":
         uart = rospy.get_param(rospy.search_param("port")) # получение имени порта, как параметра ноды
     except:
         uart = "/dev/ttyS0"
-    ros_plaz_node = ROSPlazNode(uart)
+    
+    rate = rospy.Rate(100)
+    ros_plaz_node = ROSPlazNode(uart, rate)
+
     while not rospy.is_shutdown():
         if not ros_plaz_node.spin():
             break
