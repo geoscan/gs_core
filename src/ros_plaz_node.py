@@ -380,7 +380,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             self.disconnect()
 
     def connect(self):
-        self.send_log("try to connect")
+        self.__send_log("try to connect")
         rospy.loginfo("Try to connect ...")
         self.messenger = Messenger(SerialStream(self.uart, 57600))
         self.messenger.connect()
@@ -531,7 +531,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         velocity.x = self.messenger.hub['SensorMonitor']['optFlowX'].read()[0]
                         velocity.y = self.messenger.hub['SensorMonitor']['optFlowY'].read()[0]
                         velocity.range = self.messenger.hub['SensorMonitor']['optFlowRange'].read()[0] / 1e3
-                        self.__send_log(f"response: OpticalFlow velocity - [{velocity.x}, {velocity.y}, {velocity.z}]")
+                        self.__send_log(f"response: OpticalFlow velocity - [{velocity.x}, {velocity.y}, {velocity.range}]")
                         self.opt_velocity_publisher.publish(velocity)
                     except:
                         self.__navSystem_except("OpticalFlow Module")
