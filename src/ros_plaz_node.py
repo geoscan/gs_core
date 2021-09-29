@@ -289,7 +289,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             for _ in range(0,4):
                 self.state_board_led.append(ColorRGBA())
 
-            for _ in range(0,25):
+            for _ in range(0,10):
                 self.state_module_led.append(ColorRGBA())
 
             self.messenger.hub['FlightManager']['event'].write(255)
