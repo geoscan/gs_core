@@ -366,7 +366,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         rawCapture = PiRGBArray(self.camera)
         try:
             self.camera.capture(rawCapture, format="bgr")
-            image = self.bridge.compressed_imgmsg_to_cv2(rawCapture.array)
+            image = self.bridge.cv2_to_compressed_imgmsg(rawCapture.array)
             self.camera_publisher.publish(image)
         except CvBridgeError:
             pass
