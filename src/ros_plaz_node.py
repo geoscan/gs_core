@@ -209,8 +209,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
     def handle_module_led(self, request): # функция обработки запроса на изменение цвета светодиодов на LED-модуле
         try:
             if request.leds != self.state_module_led: # сравниваем запрос с текущим состоянием светодиодов
-                    self.messenger.hub['LedBar']['color'].write( int(request.leds[0].r) | (int(request.leds[0].g) << 8) | (int(request.leds[0].b) << 16) | (255 << 24) ) # обновление цвета светодиода
-                    self.state_module_led = request.leds # запоминаем состояние светодиода
+                self.messenger.hub['LedBar']['color'].write( int(request.leds[0].r) | (int(request.leds[0].g) << 8) | (int(request.leds[0].b) << 16) | (255 << 24) ) # обновление цвета светодиода
+                self.state_module_led = request.leds # запоминаем состояние светодиода
         except:
             return LedResponse(False)  # если произошла ошибка отправки возвращаем код ошибки
         return LedResponse(True) # возвращаем True - команда выполнена
