@@ -352,7 +352,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     except TypeError:
                         rospy.loginfo("Restarting to activate LPS module")
                         self.restart_board()
-                    except:
+                    except Exception as e:
+                        rospy.loginfo(str(e))
                         self.navSystem_except("LPS")
                 elif self.navSystem == 2:
                     try:
@@ -361,7 +362,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         velocity.y = self.messenger.hub['SensorMonitor']['optFlowY'].read()[0]
                         velocity.range = self.messenger.hub['SensorMonitor']['optFlowRange'].read()[0] / 1e3
                         self.opt_velocity_publisher.publish(velocity)
-                    except:
+                    except Exception as e:
+                        print(str(e))
                         self.__navSystem_except("OpticalFlow Module")
             else:
                 self.live = False
