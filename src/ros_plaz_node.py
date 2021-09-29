@@ -93,7 +93,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.state_event = -1 # последнеее событие, отправленное в АП
         self.state_callback_event = 0 # полседнее событие пришедшее от АП
         self.state_position = [0., 0., 0., 0.] # последняя точка, на которую был отправлен коптер (в локальных координатах)
-        self.state_led=[] # текущее состояние светодиодов на Led-модуле  
+        self.state_led = [] # текущее состояние светодиодов на Led-модуле  
         self.global_point_seq = 0 # номер точки в глобальной системе
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
