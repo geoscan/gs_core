@@ -132,7 +132,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.accel_publisher = Publisher("geoscan/sensors/accel", Point, queue_size=10) # издатель темы данных акселерометра
         self.orientation_publisher = Publisher("geoscan/sensors/orientation", Orientation, queue_size=10) # издатель темы данных о положении
         self.altitude_publisher = Publisher("geoscan/sensors/altitude", Float32, queue_size=10) # издатель темы данных о высоте по барометру
-        self.camera_publisher = Publisher("geosca/pioneer_max_camera/image_raw", Image, queue_size=10)
+        self.camera_publisher = Publisher("geoscan/pioneer_max_camera/image_raw", Image, queue_size=10)
 
     def disconnect(self): # функция разрыва коммуникации между RPi и базовой платой
         if self.messenger != None:
