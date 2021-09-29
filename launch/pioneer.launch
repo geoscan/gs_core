@@ -1,10 +1,10 @@
 <launch>
     <group ns="pioneer">
-        <node pkg="cv_camera" type="cv_camera_node" name="pioneer_max_camera">
+        <!-- <node pkg="cv_camera" type="cv_camera_node" name="pioneer_max_camera">
             <param name="device_id" value="0"/>
             <param name="image_height" value="480"/>
             <param name="image_width" value="640"/>
-        </node>
+        </node> -->
         <node pkg="gs_core" type="ros_plaz_node.py" name="ros_plaz_node">
             <param name="port" value="/dev/ttyS0"/>
         </node>
