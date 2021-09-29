@@ -3,6 +3,10 @@
 
 import rospy
 import proto
+import cv2
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+from cv_bridge import CvBridge, CvBridgeError
 from proto import SerialStream, Messenger, Message
 from rospy import Publisher, Service
 from time import sleep
@@ -19,6 +23,7 @@ from gs_interfaces.msg import SimpleBatteryState,OptVelocity,Orientation, Parame
 from std_msgs.msg import Float32,ColorRGBA,Int32
 from geometry_msgs.msg import Point
 from std_srvs.srv import Empty, EmptyResponse
+from sensor_msgs.msg import Image
 
 TIME_FOR_RESTART = 5 # приблизительное время необходимое для перезапуска платы
 
@@ -94,6 +99,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
         self.rate = rate # таймер
+        self.camera = PiCamera()
+        self.bridge = CvBridge()
 
         self.alive = Service("geoscan/alive", Live, self.handle_live) # сервис, показывающий состояние подключения
 
@@ -125,6 +132,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.accel_publisher = Publisher("geoscan/sensors/accel", Point, queue_size=10) # издатель темы данных акселерометра
         self.orientation_publisher = Publisher("geoscan/sensors/orientation", Orientation, queue_size=10) # издатель темы данных о положении
         self.altitude_publisher = Publisher("geoscan/sensors/altitude", Float32, queue_size=10) # издатель темы данных о высоте по барометру
+        self.camera_publisher = Publisher("geosca/pioneer_max_camera/image_raw", Image, queue_size=10)
 
     def disconnect(self): # функция разрыва коммуникации между RPi и базовой платой
         if self.messenger != None:
@@ -371,6 +379,15 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         else:
             self.live = False
 
+    def send_image(self):
+        rawCapture = PiRGBArray(self.camera)
+        try:
+            self.camera.capture(rawCapture, format="bgr")
+            image = self.bridge.cv2_to_imgmsg(rawCapture.array, "bgr8")
+            self.camera_publisher.publish(image)
+        except CvBridgeError:
+            pass
+
     def spin(self):
         if not self.restart:
             if ((self.messenger == None) and not self.live):
@@ -384,6 +401,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     rospy.loginfo("Board is offline")
             else:
                 self.data_exchange()
+                self.send_image()
         if self.rate is not None:
             self.rate.sleep()
         return True
