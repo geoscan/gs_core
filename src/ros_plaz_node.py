@@ -93,13 +93,14 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.state_event = -1 # последнеее событие, отправленное в АП
         self.state_callback_event = 0 # полседнее событие пришедшее от АП
         self.state_position = [0., 0., 0., 0.] # последняя точка, на которую был отправлен коптер (в локальных координатах)
-        self.state_board_led=[] # текущее состояние светодиодов на базовой плате
-        self.state_module_led=[] # текущее состояние светодиодов на Led-модуле  
+        self.state_led=[] # текущее состояние светодиодов на Led-модуле  
         self.global_point_seq = 0 # номер точки в глобальной системе
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
         self.rate = rate # таймер
+
         self.camera = PiCamera()
+        self.camera.resolution = (640, 480)
         self.bridge = CvBridge()
 
         self.alive = Service("geoscan/alive", Live, self.handle_live) # сервис, показывающий состояние подключения
@@ -115,8 +116,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.yaw_service = Service("geoscan/flight/set_yaw", Yaw, self.handle_yaw) # сервис управления рысканьем
         self.event_service = Service("geoscan/flight/set_event", Event, self.handle_event) # севрис управления событиями АП
 
-        # self.board_led_service = Service("geoscan/led/board/set", Led, self.handle_board_led) # сервис управления светодиодами на базовой плате
-        self.module_led_service = Service("geoscan/led/module/set", Led, self.handle_module_led) # сервис управления светодиодами на LED-модуле
+        self.module_led_service = Service("geoscan/led/module/set", Led, self.handle_led) # сервис управления светодиодами на LED-модуле
 
         self.battery_publisher = Publisher("geoscan/battery_state", SimpleBatteryState, queue_size=10) # издатель темы состояния АКБ
 
@@ -195,22 +195,11 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             return YawResponse(False)  # если произошла ошибка отправки возвращаем код ошибки
         return YawResponse(True) # возвращаем True - команда выполнена
 
-    # def handle_board_led(self, request): # функция обработки запроса на изменение цвета светодиодов на базовой плате
-    #     try:
-    #         if request.leds != self.state_board_led: # сравниваем запрос с текущим состоянием светодиодов
-    #             for i in range(0, len(request.leds)): # делаем проход по всем светодиодам
-    #                 if request.leds[i] != self.state_board_led[i]: # если цвет на текущем светодиоде не совпадает с запрошенным, тогда обновляем на нем цвет
-    #                     self.messenger.hub['LedBar']['color'].write( int(request.leds[i].r) | (int(request.leds[i].g) << 8) | (int(request.leds[i].b) << 16) | (i << 24) ) # обновление цвета светодиода
-    #                     self.state_board_led[i] = request.leds[i] # запоминаем состояние светодиода
-    #     except:
-    #         return LedResponse(False)  # если произошла ошибка отправки возвращаем код ошибки
-    #     return LedResponse(True) # возвращаем True - команда выполнена
-
-    def handle_module_led(self, request): # функция обработки запроса на изменение цвета светодиодов на LED-модуле
+    def handle_led(self, request): # функция обработки запроса на изменение цвета светодиодов на LED-модуле
         try:
-            if request.leds != self.state_module_led: # сравниваем запрос с текущим состоянием светодиодов
+            if request.leds != self.state_led: # сравниваем запрос с текущим состоянием светодиодов
                 self.messenger.hub['LedBar']['color'].write( int(request.leds[0].r) | (int(request.leds[0].g) << 8) | (int(request.leds[0].b) << 16) | (255 << 24) ) # обновление цвета светодиода
-                self.state_module_led = request.leds # запоминаем состояние светодиода
+                self.state_led = request.leds # запоминаем состояние светодиода
         except:
             return LedResponse(False)  # если произошла ошибка отправки возвращаем код ошибки
         return LedResponse(True) # возвращаем True - команда выполнена
@@ -284,11 +273,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         if ((self.messenger.hub.model == 12) and not self.live):
             self.__get_param_from_ap()
 
-            # for _ in range(0,4):
-            #     self.state_board_led.append(ColorRGBA())
-
-            # for _ in range(0,10):
-            self.state_module_led.append(ColorRGBA())
+            self.state_led.append(ColorRGBA())
 
             self.messenger.hub['FlightManager']['event'].write(255)
             self.messenger.hub['LedBar']['color'].write(0 | (0 << 8) | (0 << 16) | (255 << 24) )
@@ -411,7 +396,7 @@ if __name__ == "__main__":
     except:
         uart = "/dev/ttyS0"
     
-    rate = rospy.Rate(50)
+    rate = rospy.Rate(100)
     ros_plaz_node = ROSPlazNode(uart, rate)
 
     while not rospy.is_shutdown():
