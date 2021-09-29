@@ -384,7 +384,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     rospy.loginfo("Board is offline")
             else:
                 self.data_exchange()
-                # self.send_image()
+                self.send_image()
         if self.rate is not None:
             self.rate.sleep()
         return True
