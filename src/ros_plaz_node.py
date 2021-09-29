@@ -293,7 +293,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 self.state_module_led.append(ColorRGBA())
 
             self.messenger.hub['FlightManager']['event'].write(255)
-            self.messenger.hub['LedBar']['color'].write(255 | (0 << 8) | (0 << 16) | (255 << 24) )
+            self.messenger.hub['LedBar']['color'].write(0 | (0 << 8) | (0 << 16) | (255 << 24) )
             self.messenger.hub.onFieldsChanged = self.__on_fields_changed
 
             self.state_event = -1
