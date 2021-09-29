@@ -209,7 +209,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
     def handle_module_led(self, request): # функция обработки запроса на изменение цвета светодиодов на LED-модуле
         try:
             if request.leds != self.state_module_led: # сравниваем запрос с текущим состоянием светодиодов
-                for i in range(4, len(request.leds) + 4): # делаем проход по всем светодиодам. Нумерация светодиодов LED-модуля начинается с 4 (поскольку всего 4 светодиода на базовой плате)
+                for i in range(0, len(request.leds)): # делаем проход по всем светодиодам. Нумерация светодиодов LED-модуля начинается с 4 (поскольку всего 4 светодиода на базовой плате)
                     if request.leds[i] != self.state_module_led[i]: # если цвет на текущем светодиоде не совпадает с запрошенным, тогда обновляем на нем цвет
                         self.messenger.hub['LedBar']['color'].write( int(request.leds[i].r) | (int(request.leds[i].g) << 8) | (int(request.leds[i].b) << 16) | (i << 24) ) # обновление цвета светодиода
                         self.state_module_led[i] = request.leds[i] # запоминаем состояние светодиода
@@ -289,7 +289,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             for _ in range(0,4):
                 self.state_board_led.append(ColorRGBA())
 
-            for _ in range(0,10):
+            for _ in range(0, 255):
                 self.state_module_led.append(ColorRGBA())
 
             self.messenger.hub['FlightManager']['event'].write(255)
