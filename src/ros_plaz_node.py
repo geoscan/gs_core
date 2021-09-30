@@ -341,8 +341,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
                         self.local_status.publish(self.messenger.hub['USNav_module']['status'].read()[0])
                     except TypeError:
-                        rospy.loginfo("Restarting to activate LPS module")
-                        self.restart_board()
+                        # rospy.loginfo("LPS module not found")
+                        self.__navSystem_except("LPS")
                     except Exception as e:
                         rospy.loginfo(str(e))
                         self.navSystem_except("LPS")
