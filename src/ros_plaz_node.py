@@ -9,7 +9,6 @@ from picamera import PiCamera
 from cv_bridge import CvBridge, CvBridgeError
 from proto import SerialStream, Messenger, Message
 from rospy import Publisher, Service
-from time import sleep
 from gs_interfaces.srv import Live, LiveResponse
 from gs_interfaces.srv import Led,LedResponse
 from gs_interfaces.srv import Event,EventResponse
@@ -128,10 +127,6 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
         self.callback_event_publisher = Publisher("geoscan/flight/callback_event", Int32, queue_size=10) # издатель темы событий, возвращаемых АП
 
-        self.gyro_publisher = Publisher("geoscan/sensors/gyro", Point, queue_size=10) # издатель темы данных гироскопа
-        self.accel_publisher = Publisher("geoscan/sensors/accel", Point, queue_size=10) # издатель темы данных акселерометра
-        self.orientation_publisher = Publisher("geoscan/sensors/orientation", Orientation, queue_size=10) # издатель темы данных о положении
-        self.altitude_publisher = Publisher("geoscan/sensors/altitude", Float32, queue_size=10) # издатель темы данных о высоте по барометру
         self.camera_publisher = Publisher("pioneer_max_camera/image_raw/compressed", CompressedImage, queue_size=10)
 
     def disconnect(self): # функция разрыва коммуникации между RPi и базовой платой
@@ -152,7 +147,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         rospy.loginfo("Restarting board ...")
         self.messenger.hub.sendCommand(18) # отправляем команду на перезапуск платы
         self.disconnect() # разрываем подключение
-        sleep(TIME_FOR_RESTART) # ожидание перезагрузки
+        rospy.sleep(TIME_FOR_RESTART) # ожидание перезагрузки
         rospy.loginfo("Restart board - done")
         self.restart = False # устанавливаем статус перезапуска
 
@@ -295,38 +290,6 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 except:
                     pass
 
-                try:
-                    gyro = Point()
-                    gyro.x = self.messenger.hub['SensorMonitor']['gyroX'].read()[0] / 1e3
-                    gyro.y = self.messenger.hub['SensorMonitor']['gyroY'].read()[0] / 1e3
-                    gyro.z = self.messenger.hub['SensorMonitor']['gyroZ'].read()[0] / 1e3
-                    self.gyro_publisher.publish(gyro)
-                except:
-                    pass
-
-                try:
-                    accel = Point()
-                    accel.x = self.messenger.hub['SensorMonitor']['accelX'].read()[0] / 1e3
-                    accel.y = self.messenger.hub['SensorMonitor']['accelY'].read()[0] / 1e3
-                    accel.z = self.messenger.hub['SensorMonitor']['accelZ'].read()[0] / 1e3
-                    self.accel_publisher.publish(accel)
-                except:
-                    pass
-
-                try:
-                    orientation = Orientation()
-                    orientation.roll = self.messenger.hub['UavMonitor']['roll'].read()[0] / 1e2
-                    orientation.pitch = self.messenger.hub['UavMonitor']['pitch'].read()[0] / 1e2
-                    orientation.azimuth = self.messenger.hub['UavMonitor']['yaw'].read()[0] / 1e2
-                    self.orientation_publisher.publish(orientation)
-                except:
-                    pass
-
-                try:
-                    self.altitude_publisher.publish(self.messenger.hub['UavMonitor']['altitude'].read()[0] / 1e3)
-                except:
-                    pass
-
                 if self.navSystem == 0:
                     self.__navSystem_except("Gnns Module")
                 elif self.navSystem == 1:
@@ -341,11 +304,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
                         self.local_status.publish(self.messenger.hub['USNav_module']['status'].read()[0])
                     except TypeError:
-                        # rospy.loginfo("LPS module not found")
                         self.__navSystem_except("LPS")
                     except Exception as e:
-                        rospy.loginfo(str(e))
-                        self.navSystem_except("LPS")
+                        self.__navSystem_except("LPS")
                 elif self.navSystem == 2:
                     try:
                         velocity = OptVelocity()
@@ -380,7 +341,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     rospy.logfatal("Serial port not specified")
                     return False
                 except:
-                    self.messenger = None
+                    self.disconnect()
                     rospy.loginfo("Board is offline")
             else:
                 self.data_exchange()
