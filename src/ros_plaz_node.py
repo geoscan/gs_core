@@ -130,7 +130,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.camera_publisher = Publisher("pioneer_max_camera/image_raw/compressed", CompressedImage, queue_size=10)
 
     def disconnect(self): # функция разрыва коммуникации между RPi и базовой платой
-        if self.messenger != None:
+        if self.messenger is not None:
             self.messenger.stop() # останвливаем поток сообщений
             self.messenger.handler.stream.socket.close() # закрываем порт
             self.messenger = None # обнуляем messenger
@@ -177,7 +177,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 fields['y'] = int(request_position[1] * 1e3 ) # присваиваем координату y с переводом из метров в милимметры
                 fields['z'] = int(request_position[2] * 1e3 ) # присваиваем координату z с переводом из метров в милимметры
                 fields['time'] = int(request.time) # присваиваем время перелета
-                self.messenger.invokeAsync(packet=fields) # отправляем запрос в АП
+                self.messenger.invoke(packet=fields) # отправляем запрос в АП
                 self.state_position = request_position # присваиваем предудщей координате запрошенную
         except:
             return PositionResponse(False) # если произошла ошибка отправки возвращаем код ошибки
@@ -237,11 +237,13 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def __on_fields_changed(self, device, fields):
         if self.messenger.hub[device].name == 'FlightManager':
-            event = self.messenger.hub['FlightManager']['event'].value
-            self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
-            if ((event != self.state_callback_event) and (event != 255)):
-                self.callback_event_publisher.publish(self.callback_event_messages.index(event))
-                self.state_callback_event = event
+            if len(fields) > 0 and self.messenger.hub[fields[0]].name == 'event':
+                event = self.messenger.hub['FlightManager']['event'].value
+                if event != 255:
+                    self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
+                if event != self.state_callback_event:
+                    self.callback_event_publisher.publish(self.callback_event_messages.index(event))
+                    self.state_callback_event = event
         elif self.messenger.hub[device].name == 'UavMonitor':
             if self.messenger.hub['UavMonitor']['mode'].value == 2:
                 self.messenger.hub['FlightManager']['event'].write(value = 255, callback = None, blocking = False)
@@ -280,7 +282,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             self.live = True
 
     def data_exchange(self):
-        if self.messenger != None:
+        if self.messenger is not None:
             if self.live:
                 try:
                     battery_state = SimpleBatteryState()
@@ -334,7 +336,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def spin(self):
         if not self.restart:
-            if ((self.messenger == None) and not self.live):
+            if ((self.messenger is None) and not self.live):
                 try:
                     self.connect()
                 except ValueError:
