@@ -237,7 +237,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def __on_fields_changed(self, device, fields):
         if self.messenger.hub[device].name == 'FlightManager':
-            if len(fields) > 0 and self.messenger.hub['FlightManager'][fields[0]].name == 'event':
+            if len(fields) > 0 and self.messenger.hub[device][fields[0]].name == 'event':
                 event = self.messenger.hub['FlightManager']['event'].value
                 if event != 255:
                     self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
@@ -305,10 +305,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         self.local_yaw_publisher.publish(self.messenger.hub['USNav_module']['yaw'].read()[0])
 
                         self.local_status.publish(self.messenger.hub['USNav_module']['status'].read()[0])
-                    except TypeError:
-                        self.__navSystem_except("LPS")
-                    except Exception as e:
-                        self.__navSystem_except("LPS")
+                    except:
+                        pass
                 elif self.navSystem == 2:
                     try:
                         velocity = OptVelocity()
@@ -316,15 +314,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         velocity.y = self.messenger.hub['SensorMonitor']['optFlowY'].read()[0]
                         velocity.range = self.messenger.hub['SensorMonitor']['optFlowRange'].read()[0] / 1e3
                         self.opt_velocity_publisher.publish(velocity)
-                    except Exception as e:
-                        print(str(e))
-                        self.__navSystem_except("OpticalFlow Module")
-            else:
-                self.live = False
-                self.disconnect()
-        else:
-            self.live = False
-            self.disconnect()
+                    except:
+                        pass
 
     def send_image(self):
         rawCapture = PiRGBArray(self.camera)
