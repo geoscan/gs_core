@@ -324,6 +324,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 self.disconnect()
         else:
             self.live = False
+            self.disconnect()
 
     def send_image(self):
         rawCapture = PiRGBArray(self.camera)
