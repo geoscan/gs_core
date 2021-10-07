@@ -305,8 +305,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         self.local_yaw_publisher.publish(self.messenger.hub['USNav_module']['yaw'].read()[0])
 
                         self.local_status.publish(self.messenger.hub['USNav_module']['status'].read()[0])
-                    except:
-                        pass
+                    except Exception as e:
+                        print(str(e))
                 elif self.navSystem == 2:
                     try:
                         velocity = OptVelocity()
