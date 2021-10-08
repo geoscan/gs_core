@@ -366,7 +366,7 @@ if __name__ == "__main__":
     except:
         uart = "/dev/ttyS0"
     
-    rate = rospy.Rate(100)
+    rate = rospy.Rate(50)
     ros_plaz_node = ROSPlazNode(uart, rate)
 
     while not rospy.is_shutdown():
