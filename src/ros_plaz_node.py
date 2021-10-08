@@ -241,7 +241,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def handle_camera_command(self, request):
         self.camera_status = request.data
-        return True
+        return SetBoolResponse(True, '')
 
     def __on_fields_changed(self, device, fields):
         if self.messenger.hub[device].name == 'FlightManager':
