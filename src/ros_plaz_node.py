@@ -22,6 +22,7 @@ from gs_interfaces.msg import SimpleBatteryState,OptVelocity,Orientation, Parame
 from std_msgs.msg import Float32,ColorRGBA,Int32
 from geometry_msgs.msg import Point
 from std_srvs.srv import Empty, EmptyResponse
+from std_srvs.srv import SetBool, SetBoolResponse
 from sensor_msgs.msg import CompressedImage
 
 TIME_FOR_RESTART = 5 # приблизительное время необходимое для перезапуска платы
@@ -97,6 +98,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
         self.rate = rate # таймер
+        self.camera_status = True
 
         self.camera = PiCamera()
         self.camera.resolution = (640, 480)
@@ -116,6 +118,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.event_service = Service("geoscan/flight/set_event", Event, self.handle_event) # севрис управления событиями АП
 
         self.module_led_service = Service("geoscan/led/module/set", Led, self.handle_led) # сервис управления светодиодами на LED-модуле
+
+        self.camera_command_service = Service("geoscan/camera/command", SetBool, self.handle_camera_command)
 
         self.battery_publisher = Publisher("geoscan/battery_state", SimpleBatteryState, queue_size=10) # издатель темы состояния АКБ
 
@@ -235,6 +239,10 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.__get_param_from_ap()
         return SetParametersListResponse(True) # возвращаем True - команда выполнена
 
+    def handle_camera_command(self, request):
+        self.camera_status = request.data
+        return SetBoolResponse(True, '')
+
     def __on_fields_changed(self, device, fields):
         if self.messenger.hub[device].name == 'FlightManager':
             if len(fields) > 0 and self.messenger.hub[device][fields[0]].name == 'event':
@@ -339,7 +347,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     rospy.loginfo("Board is offline")
             else:
                 self.data_exchange()
-                self.send_image()
+                if self.camera_status:
+                    self.send_image()
         if self.rate is not None:
             self.rate.sleep()
         return True
