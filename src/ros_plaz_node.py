@@ -275,7 +275,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             self.messenger.hub.onFieldsChanged = self.__on_fields_changed
 
             self.state_event = -1
-            self.state_callback_event = 0
+            self.state_callback_event = -1
 
             rospy.loginfo("Board start connect - done")
             self.live = True
