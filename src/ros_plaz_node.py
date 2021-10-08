@@ -237,11 +237,12 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def __on_fields_changed(self, device, fields):
         if self.messenger.hub[device].name == 'FlightManager':
-            event = self.messenger.hub['FlightManager']['event'].value
-            self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
-            if ((event != self.state_callback_event) and (event != 255)):
-                self.callback_event_publisher.publish(self.callback_event_messages.index(event))
-                self.state_callback_event = event
+            if len(fields) > 0 and fields[0] == 2:
+                event = self.messenger.hub['FlightManager']['event'].value
+                if event != 255:
+                    self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
+                    self.callback_event_publisher.publish(self.callback_event_messages.index(event))
+                    self.state_callback_event = event
         elif self.messenger.hub[device].name == 'UavMonitor':
             if self.messenger.hub['UavMonitor']['mode'].value == 2:
                 self.messenger.hub['FlightManager']['event'].write(value = 255, callback = None, blocking = False)
