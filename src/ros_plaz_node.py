@@ -90,7 +90,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.callback_event_messages = (255, 26, 31, 32, 42, 43, 51, 56, 65) # события, возвращаемые АП
         self.navSystemName = {1:"LPS", 2:"OPT"} # доступные системы позиционирования
         self.state_event = -1 # последнеее событие, отправленное в АП
-        self.state_callback_event = 0 # полседнее событие пришедшее от АП
+        self.state_callback_event = -1 # полседнее событие пришедшее от АП
         self.state_position = [0., 0., 0., 0.] # последняя точка, на которую был отправлен коптер (в локальных координатах)
         self.state_led = [] # текущее состояние светодиодов на Led-модуле  
         self.global_point_seq = 0 # номер точки в глобальной системе
@@ -275,6 +275,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             self.messenger.hub.onFieldsChanged = self.__on_fields_changed
 
             self.state_event = -1
+            self.state_callback_event = 0
 
             rospy.loginfo("Board start connect - done")
             self.live = True
