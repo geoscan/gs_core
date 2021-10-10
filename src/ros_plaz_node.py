@@ -91,14 +91,14 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.callback_event_messages = (255, 26, 31, 32, 42, 43, 51, 56, 65) # события, возвращаемые АП
         self.navSystemName = {1:"LPS", 2:"OPT"} # доступные системы позиционирования
         self.state_event = -1 # последнеее событие, отправленное в АП
-        self.state_callback_event = 0 # полседнее событие пришедшее от АП
+        self.state_callback_event = -1 # полседнее событие пришедшее от АП
         self.state_position = [0., 0., 0., 0.] # последняя точка, на которую был отправлен коптер (в локальных координатах)
         self.state_led = [] # текущее состояние светодиодов на Led-модуле  
         self.global_point_seq = 0 # номер точки в глобальной системе
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
         self.rate = rate # таймер
-        self.camera_status = True
+        self.camera_status = False
 
         self.camera = PiCamera()
         self.camera.resolution = (640, 480)
@@ -134,16 +134,10 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.camera_publisher = Publisher("pioneer_max_camera/image_raw/compressed", CompressedImage, queue_size=10)
 
     def disconnect(self): # функция разрыва коммуникации между RPi и базовой платой
-        if self.messenger != None:
+        if self.messenger is not None:
             self.messenger.stop() # останвливаем поток сообщений
             self.messenger.handler.stream.socket.close() # закрываем порт
             self.messenger = None # обнуляем messenger
-
-    def __navSystem_except(self, name): # обработка исключения при ошибки связи с модулями навигации
-        if not self.restart: # проверяем не идет ли перезагрузка платы
-            self.live = False # устанавливаем состояние подключения
-            rospy.logerr(f"{name} not found")
-            self.disconnect() # разрываем подключение, чтобы вызвать переподключение к плате
 
     def restart_board(self): # функция перезагрузки платы
         self.restart = True # устанавливаем статус перезапуска
@@ -181,7 +175,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 fields['y'] = int(request_position[1] * 1e3 ) # присваиваем координату y с переводом из метров в милимметры
                 fields['z'] = int(request_position[2] * 1e3 ) # присваиваем координату z с переводом из метров в милимметры
                 fields['time'] = int(request.time) # присваиваем время перелета
-                self.messenger.invokeAsync(packet=fields) # отправляем запрос в АП
+                self.messenger.invoke(packet=fields) # отправляем запрос в АП
                 self.state_position = request_position # присваиваем предудщей координате запрошенную
         except:
             return PositionResponse(False) # если произошла ошибка отправки возвращаем код ошибки
@@ -245,11 +239,12 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def __on_fields_changed(self, device, fields):
         if self.messenger.hub[device].name == 'FlightManager':
-            event = self.messenger.hub['FlightManager']['event'].value
-            self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
-            if ((event != self.state_callback_event) and (event != 255)):
-                self.callback_event_publisher.publish(self.callback_event_messages.index(event))
-                self.state_callback_event = event
+            if len(fields) > 0 and self.messenger.hub[device][fields[0]].name == 'event':
+                event = self.messenger.hub['FlightManager']['event'].value
+                if event != 255:
+                    self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
+                    self.callback_event_publisher.publish(self.callback_event_messages.index(event))
+                    self.state_callback_event = event
         elif self.messenger.hub[device].name == 'UavMonitor':
             if self.messenger.hub['UavMonitor']['mode'].value == 2:
                 self.messenger.hub['FlightManager']['event'].write(value = 255, callback = None, blocking = False)
@@ -283,12 +278,13 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             self.messenger.hub.onFieldsChanged = self.__on_fields_changed
 
             self.state_event = -1
+            self.state_callback_event = -1
 
             rospy.loginfo("Board start connect - done")
             self.live = True
 
     def data_exchange(self):
-        if self.messenger != None:
+        if self.messenger is not None:
             if self.live:
                 try:
                     battery_state = SimpleBatteryState()
@@ -299,7 +295,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     pass
 
                 if self.navSystem == 0:
-                    self.__navSystem_except("Gnns Module")
+                    rospy.logwarn("GPS module not found")
                 elif self.navSystem == 1:
                     try:
                         local_point = Point()
@@ -311,10 +307,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         self.local_yaw_publisher.publish(self.messenger.hub['USNav_module']['yaw'].read()[0])
 
                         self.local_status.publish(self.messenger.hub['USNav_module']['status'].read()[0])
-                    except TypeError:
-                        self.__navSystem_except("LPS")
                     except Exception as e:
-                        self.__navSystem_except("LPS")
+                        rospy.logerr("LPS not found")
                 elif self.navSystem == 2:
                     try:
                         velocity = OptVelocity()
@@ -322,14 +316,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         velocity.y = self.messenger.hub['SensorMonitor']['optFlowY'].read()[0]
                         velocity.range = self.messenger.hub['SensorMonitor']['optFlowRange'].read()[0] / 1e3
                         self.opt_velocity_publisher.publish(velocity)
-                    except Exception as e:
-                        print(str(e))
-                        self.__navSystem_except("OpticalFlow Module")
-            else:
-                self.live = False
-                self.disconnect()
-        else:
-            self.live = False
+                    except:
+                        pass
 
     def send_image(self):
         rawCapture = PiRGBArray(self.camera)
@@ -342,7 +330,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def spin(self):
         if not self.restart:
-            if ((self.messenger == None) and not self.live):
+            if ((self.messenger is None) and not self.live):
                 try:
                     self.connect()
                 except ValueError:
@@ -366,7 +354,7 @@ if __name__ == "__main__":
     except:
         uart = "/dev/ttyS0"
     
-    rate = rospy.Rate(50)
+    rate = rospy.Rate(100)
     ros_plaz_node = ROSPlazNode(uart, rate)
 
     while not rospy.is_shutdown():
