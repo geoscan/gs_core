@@ -28,7 +28,7 @@ from sensor_msgs.msg import CompressedImage
 TIME_FOR_RESTART = 5 # приблизительное время необходимое для перезапуска платы
 
 class ROSPlazNode(): # класс ноды ros_plaz_node
-    def __init__(self, uart="/dev/ttyS0", rate = None):
+    def __init__(self, uart="/dev/ttyS0", baudrate = 57600, rate = None):
         self.navSystemParam = { # параметры необходимые для изменения систем позиционирования
             "GPS": [
                 Parameter("BoardPioneer_modules_gnss", 1.0),
@@ -84,6 +84,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         }
 
         self.uart = uart # название порта
+        self.baudrate = baudrate # скорость обмена данных между RPi и базовой платы
         self.live = False # состояние подключение к базовой платы АП
         self.restart = False # состояние перезапуска
         self.navSystem = 1 # текущая система позиционирования
@@ -266,7 +267,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def connect(self):
         rospy.loginfo("Try to connect ...")
-        self.messenger = Messenger(SerialStream(self.uart, 57600))
+        self.messenger = Messenger(SerialStream(self.uart, self.baudrate))
         self.messenger.connect()
         if ((self.messenger.hub.model == 12) and not self.live):
             self.__get_param_from_ap()
@@ -353,9 +354,14 @@ if __name__ == "__main__":
         uart = rospy.get_param(rospy.search_param("port")) # получение имени порта, как параметра ноды
     except:
         uart = "/dev/ttyS0"
-    
+
+    try:
+        baudrate = rospy.get_param(rospy.search_param("baudrate")) # получение скорости обмена данными, как параметра ноды
+    except:
+        baudrate = 57600
+
     rate = rospy.Rate(100)
-    ros_plaz_node = ROSPlazNode(uart, rate)
+    ros_plaz_node = ROSPlazNode(uart, baudrate ,rate)
 
     while not rospy.is_shutdown():
         if not ros_plaz_node.spin():
