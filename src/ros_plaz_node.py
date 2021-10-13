@@ -290,7 +290,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 try:
                     battery_state = SimpleBatteryState()
                     battery_state.header.stamp = rospy.Time.now()
-                    battery_state.charge = self.messenger.hub['CBoard']['VoltBatt'].read()[0] / 1000.0
+                    battery_state.charge = self.messenger.hub['SensorMonitor']['voltage'].read()[0] / 1000.0
                     self.battery_publisher.publish(battery_state)
                 except:
                     pass
