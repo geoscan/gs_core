@@ -93,7 +93,6 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.navSystemName = {1:"LPS", 2:"OPT"} # доступные системы позиционирования
         self.state_event = -1 # последнеее событие, отправленное в АП
         self.state_callback_event = -1 # полседнее событие пришедшее от АП
-        self.state_position = [0., 0., 0., 0.] # последняя точка, на которую был отправлен коптер (в локальных координатах)
         self.state_led = [] # текущее состояние светодиодов на Led-модуле  
         self.global_point_seq = 0 # номер точки в глобальной системе
         self.autopilot_params = [] # выгруженные параметры АП
@@ -169,15 +168,13 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
     def handle_local_pos(self, request): # функция обработки запроса на полет в локальную точку
         request_position = [request.position.x, request.position.y, request.position.z] # запоминаем координаты точки из запроса
         try:
-            if request_position != self.state_position: # сравниваем координаты точки с предыдущими координатами
-                fields = {} # объявляем тело запроса в АП
-                fields['id'] = Message.GOTO_LOCAL_POINT # присваиваем тип сообщения
-                fields['x'] = int(request_position[0] * 1e3 ) # присваиваем координату x с переводом из метров в милимметры
-                fields['y'] = int(request_position[1] * 1e3 ) # присваиваем координату y с переводом из метров в милимметры
-                fields['z'] = int(request_position[2] * 1e3 ) # присваиваем координату z с переводом из метров в милимметры
-                fields['time'] = int(request.time) # присваиваем время перелета
-                self.messenger.invoke(packet=fields) # отправляем запрос в АП
-                self.state_position = request_position # присваиваем предудщей координате запрошенную
+            fields = {} # объявляем тело запроса в АП
+            fields['id'] = Message.GOTO_LOCAL_POINT # присваиваем тип сообщения
+            fields['x'] = int(request_position[0] * 1e3 ) # присваиваем координату x с переводом из метров в милимметры
+            fields['y'] = int(request_position[1] * 1e3 ) # присваиваем координату y с переводом из метров в милимметры
+            fields['z'] = int(request_position[2] * 1e3 ) # присваиваем координату z с переводом из метров в милимметры
+            fields['time'] = int(request.time) # присваиваем время перелета
+            self.messenger.invoke(packet=fields) # отправляем запрос в АП
         except:
             return PositionResponse(False) # если произошла ошибка отправки возвращаем код ошибки
         return PositionResponse(True) # возвращаем True - команда выполнена
