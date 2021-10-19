@@ -302,7 +302,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         local_point.z = self.messenger.hub['USNav_module']['z'].read()[0] * 0.001
                         self.local_position_publisher.publish(local_point)
 
-                        self.local_yaw_publisher.publish(self.messenger.hub['USNav_module']['yaw'].read()[0] * 0.001)
+                        self.local_yaw_publisher.publish(self.messenger.hub['USNav_module']['yaw'].read()[0] * 0.01)
 
                         self.local_status.publish(self.messenger.hub['USNav_module']['status'].read()[0])
                     except:
