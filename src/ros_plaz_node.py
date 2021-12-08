@@ -355,11 +355,12 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def __on_fields_changed(self, device, fields):
         if self.messenger.hub[device].name == 'FlightManager':
-            event = self.messenger.hub['FlightManager']['event'].value
-            self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
-            if ((event != self.state_callback_event) and (event != 255)):
-                self.callback_event_publisher.publish(self.callback_event_messages.index(event))
-                self.state_callback_event = event
+            if len(fields) > 0 and self.messenger.hub[device][fields[0]].name == 'event':
+                event = self.messenger.hub['FlightManager']['event'].value
+                if event != 255:
+                    self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
+                    self.callback_event_publisher.publish(self.callback_event_messages.index(event))
+                    self.state_callback_event = event
         elif self.messenger.hub[device].name == 'UavMonitor':
             if self.messenger.hub['UavMonitor']['mode'].value == 2:
                 self.messenger.hub['FlightManager']['event'].write(value = 255, callback = None, blocking = False)
@@ -508,7 +509,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         self.local_position_publisher.publish(local_point)
 
                         self.__send_log("send: LPS yaw request")
-                        yaw = self.messenger.hub['USNav_module']['yaw'].read()[0]
+                        yaw = self.messenger.hub['USNav_module']['yaw'].read()[0] * 0.01
                         self.__send_log(f"response: LPS yaw - {yaw}")
                         self.local_yaw_publisher.publish(yaw)
 
@@ -564,6 +565,9 @@ if __name__ == "__main__":
     try:
         uart = rospy.get_param(rospy.search_param("port")) # получение имени порта, как параметра ноды
     except:
+        uart = "/dev/ttyS0"
+
+    if type(uart) == dict:
         uart = "/dev/ttyS0"
     
     rate = rospy.Rate(100)
