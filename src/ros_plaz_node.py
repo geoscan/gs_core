@@ -4,6 +4,7 @@
 import rospy
 import proto
 import cv2
+from time import sleep
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 from cv_bridge import CvBridge, CvBridgeError
@@ -18,12 +19,14 @@ from gs_interfaces.srv import Position,PositionResponse
 from gs_interfaces.srv import Yaw, YawResponse
 from gs_interfaces.srv import ParametersList, ParametersListResponse
 from gs_interfaces.srv import SetParametersList, SetParametersListResponse
-from gs_interfaces.msg import SimpleBatteryState,OptVelocity,Orientation, Parameter
+from gs_interfaces.srv import Wait, WaitResponse
+from gs_interfaces.msg import SimpleBatteryState, OptVelocity, Parameter
 from std_msgs.msg import Float32,ColorRGBA,Int32
 from geometry_msgs.msg import Point
 from std_srvs.srv import Empty, EmptyResponse
 from std_srvs.srv import SetBool, SetBoolResponse
 from sensor_msgs.msg import CompressedImage
+from threading import Thread
 
 TIME_FOR_RESTART = 5 # приблизительное время необходимое для перезапуска платы
 
@@ -116,6 +119,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.local_position_service = Service("geoscan/flight/set_local_position", Position, self.handle_local_pos) # сервис полета в локальную точку
         self.yaw_service = Service("geoscan/flight/set_yaw", Yaw, self.handle_yaw) # сервис управления рысканьем
         self.event_service = Service("geoscan/flight/set_event", Event, self.handle_event) # севрис управления событиями АП
+        self.wait_service = Service("geoscan/flight/set_wait", Wait, self.handle_wait) # сервис ожидания
 
         self.module_led_service = Service("geoscan/led/module/set", Led, self.handle_led) # сервис управления светодиодами на LED-модуле
 
@@ -149,12 +153,20 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         rospy.loginfo("Restart board - done")
         self.restart = False # устанавливаем статус перезапуска
 
+    def __wait(self, seconds):
+        sleep(seconds)
+        self.callback_event_publisher.publish(9)
+
     def handle_restart(self, request): # функция обработки запроса на перезагрузку
         self.restart_board() # перезапускам плату
         return EmptyResponse() # возвращаем пустой ответ
 
     def handle_live(self, request): 
         return LiveResponse(self.live)
+
+    def handle_wait(self, request):
+        Thread(target=self.__wait, args=(request.seconds,)).start()
+        return WaitResponse(True)
 
     def handle_event(self, request): # функция обработки запроса на отправление события в АП
         try:
@@ -352,9 +364,15 @@ if __name__ == "__main__":
     except:
         uart = "/dev/ttyS0"
 
+    if type(uart) == dict:
+        uart = "/dev/ttyS0"
+
     try:
         baudrate = rospy.get_param(rospy.search_param("baudrate")) # получение скорости обмена данными, как параметра ноды
     except:
+        baudrate = 57600
+
+    if type(baudrate) == dict:
         baudrate = 57600
 
     rate = rospy.Rate(100)
