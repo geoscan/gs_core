@@ -7,20 +7,20 @@ from proto import SerialStream, Messenger, Message
 from rospy import Publisher, Service
 from time import sleep, time
 from gs_interfaces.srv import Live, LiveResponse
-from gs_interfaces.srv import Log,LogResponse
-from gs_interfaces.srv import Led,LedResponse
-from gs_interfaces.srv import Event,EventResponse
-from gs_interfaces.srv import Time,TimeResponse
-from gs_interfaces.srv import Info,InfoResponse
-from gs_interfaces.srv import NavigationSystem,NavigationSystemResponse
-from gs_interfaces.srv import SetNavigationSystem,SetNavigationSystemResponse
-from gs_interfaces.srv import Position,PositionResponse
-from gs_interfaces.srv import PositionGPS,PositionGPSResponse
+from gs_interfaces.srv import Log, LogResponse
+from gs_interfaces.srv import Led, LedResponse
+from gs_interfaces.srv import Event, EventResponse
+from gs_interfaces.srv import Time, TimeResponse
+from gs_interfaces.srv import Info, InfoResponse
+from gs_interfaces.srv import NavigationSystem, NavigationSystemResponse
+from gs_interfaces.srv import SetNavigationSystem, SetNavigationSystemResponse
+from gs_interfaces.srv import Position, PositionResponse
+from gs_interfaces.srv import PositionGPS, PositionGPSResponse
 from gs_interfaces.srv import Yaw, YawResponse
 from gs_interfaces.srv import ParametersList, ParametersListResponse
 from gs_interfaces.srv import SetParametersList, SetParametersListResponse
-from gs_interfaces.msg import SimpleBatteryState,PointGPS,OptVelocity,Orientation,SatellitesGPS, Parameter
-from std_msgs.msg import String,Float32,ColorRGBA,Int32,Int8
+from gs_interfaces.msg import SimpleBatteryState, PointGPS, OptVelocity, Orientation, SatellitesGPS, Parameter
+from std_msgs.msg import String, Float32, ColorRGBA, Int32, Int8
 from geometry_msgs.msg import Point
 from std_srvs.srv import Empty, EmptyResponse
 
@@ -94,14 +94,14 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.state_callback_event = 0 # полседнее событие пришедшее от АП
         self.state_position = [0., 0., 0., 0.] # последняя точка, на которую был отправлен коптер (в локальных координатах)
         self.state_gps_position = [0., 0., 0.] # последняя координата, нак оторую был отправлен коптер (в глобальных координатах)
-        self.state_board_led=[] # текущее состояние светодиодов на базовой плате
-        self.state_module_led=[] # текущее состояние светодиодов на Led-модуле  
+        self.state_board_led = [] # текущее состояние светодиодов на базовой плате
+        self.state_module_led = [] # текущее состояние светодиодов на Led-модуле  
         self.global_point_seq = 0 # номер точки в глобальной системе
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
         self.rate = rate # таймер
 
-        self.logger = Service("geoscan/get_log",Log, self.handle_log) # сервис логов
+        self.logger = Service("geoscan/get_log", Log, self.handle_log) # сервис логов
         self.alive = Service("geoscan/alive", Live, self.handle_live) # сервис, показывающий состояние подключения
 
         self.info_service = Service("geoscan/board/get_info", Info, self.handle_info) # сервис, возвращающий бортовую информация
@@ -125,25 +125,25 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
         self.logger_publisher = Publisher("geoscan/log", String, queue_size=10) # издатель темы логов
 
-        self.battery_publisher = Publisher("geoscan/battery_state", SimpleBatteryState, queue_size=10) # издатель темы состояния АКБ
+        self.battery_publisher = Publisher("geoscan/battery_state", SimpleBatteryState, queue_size = 10) # издатель темы состояния АКБ
 
-        self.local_position_publisher = Publisher("geoscan/navigation/local/position", Point, queue_size=10) # издатель темы позиции в LPS
-        self.local_yaw_publisher = Publisher("geoscan/navigation/local/yaw", Float32, queue_size=10) # издаетель темы рысканья в LPS
-        self.local_velocity_publisher = Publisher("geoscan/navigation/local/velocity", Point, queue_size=10) # издатель темы ускорения в LPS
+        self.local_position_publisher = Publisher("geoscan/navigation/local/position", Point, queue_size = 10) # издатель темы позиции в LPS
+        self.local_yaw_publisher = Publisher("geoscan/navigation/local/yaw", Float32, queue_size = 10) # издаетель темы рысканья в LPS
+        self.local_velocity_publisher = Publisher("geoscan/navigation/local/velocity", Point, queue_size = 10) # издатель темы ускорения в LPS
 
-        self.global_position_publisher = Publisher("geoscan/navigation/global/position", PointGPS, queue_size=10) # издатель темы позиции в GPS
-        self.global_status_publisher = Publisher("geoscan/navigation/global/status", Int8, queue_size=10) # издатель темы статуса GPS модуля
-        self.satellites_publisher = Publisher("geoscan/navigation/satellites", SatellitesGPS, queue_size=10) # издатель темы состояния спутников
+        self.global_position_publisher = Publisher("geoscan/navigation/global/position", PointGPS, queue_size = 10) # издатель темы позиции в GPS
+        self.global_status_publisher = Publisher("geoscan/navigation/global/status", Int8, queue_size = 10) # издатель темы статуса GPS модуля
+        self.satellites_publisher = Publisher("geoscan/navigation/satellites", SatellitesGPS, queue_size = 10) # издатель темы состояния спутников
 
-        self.opt_velocity_publisher = Publisher("geoscan/navigation/opt/velocity", OptVelocity, queue_size=10) # издатель темы ускорения в OPT
+        self.opt_velocity_publisher = Publisher("geoscan/navigation/opt/velocity", OptVelocity, queue_size = 10) # издатель темы ускорения в OPT
 
-        self.callback_event_publisher = Publisher("geoscan/flight/callback_event", Int32, queue_size=10) # издатель темы событий, возвращаемых АП
+        self.callback_event_publisher = Publisher("geoscan/flight/callback_event", Int32, queue_size = 10) # издатель темы событий, возвращаемых АП
 
-        self.gyro_publisher = Publisher("geoscan/sensors/gyro", Point, queue_size=10) # издатель темы данных гироскопа
-        self.accel_publisher = Publisher("geoscan/sensors/accel", Point, queue_size=10) # издатель темы данных акселерометра
-        self.orientation_publisher = Publisher("geoscan/sensors/orientation", Orientation, queue_size=10) # издатель темы данных о положении
-        self.altitude_publisher = Publisher("geoscan/sensors/altitude", Float32, queue_size=10) # издатель темы данных о высоте по барометру
-        self.mag_publisher = Publisher("geoscan/sensors/mag", Point, queue_size=10) # издатель темы данных магнитометра
+        self.gyro_publisher = Publisher("geoscan/sensors/gyro", Point, queue_size = 10) # издатель темы данных гироскопа
+        self.accel_publisher = Publisher("geoscan/sensors/accel", Point, queue_size = 10) # издатель темы данных акселерометра
+        self.orientation_publisher = Publisher("geoscan/sensors/orientation", Orientation, queue_size = 10) # издатель темы данных о положении
+        self.altitude_publisher = Publisher("geoscan/sensors/altitude", Float32, queue_size = 10) # издатель темы данных о высоте по барометру
+        self.mag_publisher = Publisher("geoscan/sensors/mag", Point, queue_size = 10) # издатель темы данных магнитометра
 
 
     def __send_log(self, msg): # функция отправки сообщения в лог
@@ -371,7 +371,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
     def __get_param_from_ap(self):
         try:
             self.autopilot_params = []
-            for i in range(0, self.messenger.hub.getParamCount()):
+            for i in range(self.messenger.hub.getParamCount()):
                 parameter = Parameter()
                 parameter.name, parameter.value = self.messenger.hub.getParam(i)
                 if parameter.name == 'Flight_com_navSystem':
@@ -385,13 +385,13 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         rospy.loginfo("Try to connect ...")
         self.messenger = Messenger(SerialStream(self.uart, 57600))
         self.messenger.connect()
-        if ((self.messenger.hub.model == 12) and not self.live):
+        if (self.messenger.hub.model == 12) and not self.live:
             self.__get_param_from_ap()
 
-            for _ in range(0,4):
+            for _ in range(4):
                 self.state_board_led.append(ColorRGBA())
 
-            for _ in range(0,25):
+            for _ in range(25):
                 self.state_module_led.append(ColorRGBA())
 
             self.messenger.hub['FlightManager']['event'].write(255)
@@ -544,7 +544,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
     def spin(self):
         if not self.restart:
-            if ((self.messenger == None) and not self.live):
+            if (self.messenger == None) and not self.live:
                 try:
                     self.connect()
                 except ValueError:
