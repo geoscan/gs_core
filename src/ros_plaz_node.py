@@ -357,7 +357,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         if self.messenger.hub[device].name == 'FlightManager':
             if len(fields) > 0 and self.messenger.hub[device][fields[0]].name == 'event':
                 event = self.messenger.hub['FlightManager']['event'].value
-                if event != 255:
+                if (event != 255) and (event != self.state_callback_event):
                     self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
                     self.callback_event_publisher.publish(self.callback_event_messages.index(event))
                     self.state_callback_event = event
