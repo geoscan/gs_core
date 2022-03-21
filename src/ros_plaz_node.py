@@ -524,7 +524,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         rospy.loginfo("Restarting to activate LPS module")
                         self.restart_board()
                     except:
-                        self.navSystem_except("LPS")
+                        self.__navSystem_except("LPS")
                 elif self.navSystem == 2:
                     try:
                         self.__send_log("send: OpticalFlow velocity request")
