@@ -135,6 +135,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
 
         self.callback_event_publisher = Publisher("geoscan/flight/callback_event", Int32, queue_size=10) # издатель темы событий, возвращаемых АП
 
+        self.led_publisher = Publisher("geoscan/led/module/color", ColorRGBA, queue_size=10)
+
         self.camera_publisher = Publisher("pioneer_max_camera/image_raw/compressed", CompressedImage, queue_size=10)
 
     def disconnect(self): # функция разрыва коммуникации между RPi и базовой платой
@@ -203,6 +205,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             if request.leds != self.state_led: # сравниваем запрос с текущим состоянием светодиодов
                 self.messenger.hub['LedBar']['color'].write( int(request.leds[0].r) | (int(request.leds[0].g) << 8) | (int(request.leds[0].b) << 16) | (255 << 24) ) # обновление цвета светодиода
                 self.state_led = request.leds # запоминаем состояние светодиода
+                self.led_publisher.publish(self.state_led)
         except:
             return LedResponse(False)  # если произошла ошибка отправки возвращаем код ошибки
         return LedResponse(True) # возвращаем True - команда выполнена
@@ -282,6 +285,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             self.__get_param_from_ap()
 
             self.state_led.append(ColorRGBA())
+            self.led_publisher.publish(self.state_led)
 
             self.messenger.hub['FlightManager']['event'].write(255)
             self.messenger.hub['LedBar']['color'].write(0 | (0 << 8) | (0 << 16) | (255 << 24) )
