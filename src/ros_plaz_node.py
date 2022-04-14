@@ -101,7 +101,10 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
         self.rate = rate # таймер
-        self.camera_status = False
+        self.camera_status = False # статус камеры
+
+        self.__seq = 0
+        self.__frame_id = "base"
 
         self.camera = PiCamera()
         self.camera.resolution = (640, 480)
@@ -254,7 +257,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         if self.messenger.hub[device].name == 'FlightManager':
             if len(fields) > 0 and self.messenger.hub[device][fields[0]].name == 'event':
                 event = self.messenger.hub['FlightManager']['event'].value
-                if event != 255:
+                if (event != 255) and (event != self.state_callback_event):
                     self.messenger.hub['FlightManager']['event'].write(value = event, callback = None, blocking = False)
                     self.callback_event_publisher.publish(self.callback_event_messages.index(event))
                     self.state_callback_event = event
@@ -302,7 +305,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             if self.live:
                 try:
                     battery_state = SimpleBatteryState()
+                    battery_state.header.seq = self.__seq
                     battery_state.header.stamp = rospy.Time.now()
+                    battery_state.header.frame_id = self.__frame_id
                     battery_state.charge = self.messenger.hub['SensorMonitor']['voltage'].read()[0] / 1000.0
                     self.battery_publisher.publish(battery_state)
                 except:
@@ -326,12 +331,16 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 elif self.navSystem == 2:
                     try:
                         velocity = OptVelocity()
+                        velocity.header.seq = self.__seq
+                        velocity.header.stamp = rospy.Time.now()
+                        velocity.header.frame_id = self.__frame_id
                         velocity.x = self.messenger.hub['SensorMonitor']['optFlowX'].read()[0]
                         velocity.y = self.messenger.hub['SensorMonitor']['optFlowY'].read()[0]
                         velocity.range = self.messenger.hub['SensorMonitor']['optFlowRange'].read()[0] / 1e3
                         self.opt_velocity_publisher.publish(velocity)
                     except:
-                        pass
+                        rospy.logwarn("OPT module not found")
+                self.__seq += 1
 
     def send_image(self):
         rawCapture = PiRGBArray(self.camera)

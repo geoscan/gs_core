@@ -23,6 +23,7 @@
 * geoscan/flight/set_event (gs_interfaces/Event) - приказывает автопилоту выполнить Event
 * geoscan/flight/set_yaw (gs_interfaces/Yaw) - приказывает автоплоту выполнить рысканье
 * geoscan/flight/set_local_position (gs_interfaces/Position) - приказывает автопилоту выполнить перемещение в локальных координатах
+* geoscan/flight/set_wait (gs_interfaces/Wait) - зависание в воздухе
 * geoscan/led/module/set (gs_interfaces/Led) - управление светодиодами
 * geoscan/board/get_parameters (gs_interface/ParametersList) - возварщает параметры АП
 * geoscan/board/set_parameters (gs_interface/SetParametersList) - устанавливает параметры АП
@@ -37,6 +38,7 @@
 * geoscan/navigation/local/status (std_msgs/Int32) - статус LPS
 * geoscan/navigation/opt/velocity (gs_interfaces/OptVelocity) - данные с модуля оптического потока (OPT)
 * geoscan/flight/callback_event (std_msgs/Int32) - события вытопилота
+* geoscan/led/module/color (std_msgs/ColorRGBA) - текущий цвет светодиодов
 * pioneer_max_camera/image_raw/compressed (sensor_msgs/CompressedImage) - изображение с камеры
 
 ## Описание Python скриптов:
