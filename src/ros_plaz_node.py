@@ -101,6 +101,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
         self.rate = rate # таймер
 
+        self.__seq = 0 # идентификатор последовательности
+        self.__frame_id = "base"
+
         self.logger = Service("geoscan/get_log", Log, self.handle_log) # сервис логов
         self.alive = Service("geoscan/alive", Live, self.handle_live) # сервис, показывающий состояние подключения
 
@@ -409,7 +412,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 try:
                     self.__send_log("send: Battery state request")
                     battery_state = SimpleBatteryState()
+                    battery_state.header.seq = self.__seq
                     battery_state.header.stamp = rospy.Time.now()
+                    battery_state.header.frame_id = self.__frame_id
                     battery_state.charge = self.messenger.hub['CBoard']['VoltBatt'].read()[0] / 1000.0
                     self.__send_log(f"response: Battery state - {battery_state.charge}")
                     self.battery_publisher.publish(battery_state)
@@ -441,6 +446,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 try:
                     self.__send_log("send: Orientation request")
                     orientation = Orientation()
+                    orientation.header.seq = self.__seq
+                    orientation.header.stamp = rospy.Time.now()
+                    orientation.header.frame_id = self.__frame_id
                     orientation.roll = self.messenger.hub['UavMonitor']['roll'].read()[0] / 1e2
                     orientation.pitch = self.messenger.hub['UavMonitor']['pitch'].read()[0] / 1e2
                     orientation.azimuth = self.messenger.hub['UavMonitor']['yaw'].read()[0] / 1e2
@@ -461,6 +469,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     try:
                         self.__send_log("send: Global position request")
                         global_point = PointGPS()
+                        global_point.header.seq = self.__seq
+                        global_point.header.stamp = rospy.Time.now()
+                        global_point.header.frame_id = self.__frame_id
                         global_point.latitude = self.messenger.hub['Ublox']['latitude'].read()[0] / 1e7
                         global_point.longitude = self.messenger.hub['Ublox']['longitude'].read()[0] / 1e7
                         global_point.altitude = self.messenger.hub['Ublox']['altitude'].read()[0] / 1e3
@@ -476,6 +487,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         self.mag_publisher.publish(mag)
 
                         sat = SatellitesGPS()
+                        sat.header.seq = self.__seq
+                        sat.header.stamp = rospy.Time.now()
+                        sat.header.frame_id = self.__frame_id
                         try:
                             sat.gps = self.messenger.hub['Ublox']['satGps'].read()[0]
                         except:
@@ -529,6 +543,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                     try:
                         self.__send_log("send: OpticalFlow velocity request")
                         velocity = OptVelocity()
+                        velocity.header.seq = self.__seq
+                        velocity.header.stamp = rospy.Time.now()
+                        velocity.header.frame_id = self.__frame_id
                         velocity.x = self.messenger.hub['SensorMonitor']['optFlowX'].read()[0]
                         velocity.y = self.messenger.hub['SensorMonitor']['optFlowY'].read()[0]
                         velocity.range = self.messenger.hub['SensorMonitor']['optFlowRange'].read()[0] / 1e3
@@ -536,6 +553,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                         self.opt_velocity_publisher.publish(velocity)
                     except:
                         self.__navSystem_except("OpticalFlow Module")
+                self.__seq += 1
             else:
                 self.live = False
                 self.disconnect()
