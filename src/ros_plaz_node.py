@@ -4,7 +4,7 @@
 import rospy
 import proto
 from proto import SerialStream, Messenger, Message
-from rospy import Publisher, Service
+from rospy import Publisher, Service, Subscriber
 from time import sleep, time
 from gs_interfaces.srv import Live, LiveResponse
 from gs_interfaces.srv import Log, LogResponse
@@ -21,7 +21,7 @@ from gs_interfaces.srv import ParametersList, ParametersListResponse
 from gs_interfaces.srv import SetParametersList, SetParametersListResponse
 from gs_interfaces.msg import SimpleBatteryState, PointGPS, OptVelocity, Orientation, SatellitesGPS, Parameter
 from std_msgs.msg import String, Float32, ColorRGBA, Int32, Int8
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, Twist
 from std_srvs.srv import Empty, EmptyResponse
 
 TIME_FOR_RESTART = 5 # приблизительное время необходимое для перезапуска платы
@@ -100,6 +100,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.autopilot_params = [] # выгруженные параметры АП
         self.messenger = None # основной объект класса Messenger, отвечающий за коммуникацию между RPi и базовой платы
         self.rate = rate # таймер
+        self.manual = False # флаг управления по скоростям
 
         self.__seq = 0 # идентификатор последовательности
         self.__frame_id = "base"
@@ -147,7 +148,8 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
         self.orientation_publisher = Publisher("geoscan/sensors/orientation", Orientation, queue_size = 10) # издатель темы данных о положении
         self.altitude_publisher = Publisher("geoscan/sensors/altitude", Float32, queue_size = 10) # издатель темы данных о высоте по барометру
         self.mag_publisher = Publisher("geoscan/sensors/mag", Point, queue_size = 10) # издатель темы данных магнитометра
-
+        
+        self.manual_speed_subscriber = Subscriber("geoscan/flight/cmd_vel", Twist, self.manual_speed_callback) # подписчик управления по скоростям
 
     def __send_log(self, msg): # функция отправки сообщения в лог
         msg = f"[{time()}] {msg}"
@@ -355,6 +357,15 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             return SetParametersListResponse(False) # если не получен ответ возвращаем код ошибки
         self.__get_param_from_ap()
         return SetParametersListResponse(True) # возвращаем True - команда выполнена
+    
+    def manual_speed_callback(self, cmd_vel):
+        if not self.manual:
+            self.messenger.hub['ManualControl']['mode'].write(5, blocking=False)
+            self.manual = True
+        self.messenger.hub['ManualControl']['northSpeed'].write(int(cmd_vel.linear.x * 1e2), blocking=False)
+        self.messenger.hub['ManualControl']['eastSpeed'].write(int(cmd_vel.linear.y * 1e2), blocking=False)
+        self.messenger.hub['ManualControl']['downSpeed'].write(int(cmd_vel.linear.x * 1e2), blocking=False)
+        self.messenger.hub['ManualControl']['yawSpeed'].write(int(cmd_vel.angular.z * 1e2), blocking=False)
 
     def __on_fields_changed(self, device, fields):
         if self.messenger.hub[device].name == 'FlightManager':
@@ -370,6 +381,9 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
                 if self.state_callback_event != 255:
                     self.state_callback_event = 255
                     self.callback_event_publisher.publish(self.callback_event_messages.index(self.state_callback_event))
+        elif self.messenger.hub[device].name == 'ManualControl':
+            if (self.messenger.hub['ManualControl']['mode'].value == 0) and (self.manual):
+                self.manual = False
 
     def __get_param_from_ap(self):
         try:
