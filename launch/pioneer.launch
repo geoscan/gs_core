@@ -1,5 +1,6 @@
 <launch>
+    <arg name="port" default="/dev/ttyTHS1"/>
     <node pkg="gs_core" type="ros_plaz_node.py" name="ros_plaz_node">
-        <param name="port" value="/dev/ttyS0"/>
+        <param name="port" value="$(arg port)"/>
     </node>
 </launch>
