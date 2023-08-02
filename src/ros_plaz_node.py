@@ -364,7 +364,7 @@ class ROSPlazNode(): # класс ноды ros_plaz_node
             self.manual = True
         self.messenger.hub['ManualControl']['northSpeed'].write(int(cmd_vel.linear.x * 1e2), blocking=False)
         self.messenger.hub['ManualControl']['eastSpeed'].write(int(cmd_vel.linear.y * 1e2), blocking=False)
-        self.messenger.hub['ManualControl']['downSpeed'].write(int(cmd_vel.linear.x * 1e2), blocking=False)
+        self.messenger.hub['ManualControl']['downSpeed'].write(int(cmd_vel.linear.z * 1e2), blocking=False)
         self.messenger.hub['ManualControl']['yawSpeed'].write(int(cmd_vel.angular.z * 1e2), blocking=False)
 
     def __on_fields_changed(self, device, fields):
